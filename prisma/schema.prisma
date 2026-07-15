@@ -1,0 +1,303 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// SQLite has no native enum type, so status/category-style fields are plain
+// Strings validated at the application boundary (see src/lib/types/enums.ts).
+// This also keeps the schema portable to Postgres later and lets users add
+// custom workout types/exercises without fighting a fixed enum.
+//
+// Every row is scoped by userId (even though v1 seeds a single default user)
+// so the schema is ready for real multi-user accounts without a rewrite.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// User & preferences
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?  @unique
+  createdAt DateTime @default(now())
+
+  preferences         UserPreferences?
+  workoutTypes        WorkoutType[]
+  exercises           Exercise[]
+  exercisePreferences ExercisePreference[]
+  goals               Goal[]
+  workoutEvents       WorkoutEvent[]
+  workouts            Workout[]
+  achievements        Achievement[]
+  bodyWeightLogs      BodyWeightLog[]
+  coachMemories       CoachMemory[]
+  coachInsights       CoachInsight[]
+}
+
+model UserPreferences {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Weekly goal structure (Home Page spec): 1 Leg Day + 1 Upper Body + 1 Cardio + 1 Fun = 4/week
+  weeklyLegDayTarget    Int @default(1)
+  weeklyUpperBodyTarget Int @default(1)
+  weeklyCardioTarget    Int @default(1)
+  weeklyFunTarget       Int @default(1)
+  monthlyWorkoutTarget  Int @default(18)
+
+  unitSystem            String    @default("imperial") // "imperial" | "metric"
+  topPriorityCategory   String? // e.g. "glutes_legs" - highest fitness priority, informs exercise selection
+  onboardingCompletedAt DateTime?
+
+  createdAt DateTime @updatedAt
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Workout taxonomy
+// ---------------------------------------------------------------------------
+
+// category: WEIGHTLIFTING | CARDIO | FUN | RECOVERY
+// colorKey: subtype key into src/lib/design/categories.ts (drives the two-level color system)
+model WorkoutType {
+  id                      String   @id @default(uuid())
+  userId                  String
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                    String
+  category                String
+  colorKey                String
+  isCustom                Boolean  @default(false)
+  requiresRecommendation  Boolean  @default(true) // false for Yoga/Pilates/Pickleball/Other: just duration+notes
+  createdAt               DateTime @default(now())
+
+  workoutEvents WorkoutEvent[]
+  workouts      Workout[]
+
+  @@unique([userId, name])
+}
+
+// workoutCategory: "glutes_legs" | "chest_triceps" | "back_biceps" | "abs" | "cardio"
+// movementCategory: e.g. "squat_lunge" | "hip_hinge" | "hip_thrust_bridge" | "glute_abduction" | ...
+// kind: "STRENGTH" | "CARDIO"
+model Exercise {
+  id                  String   @id @default(uuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  workoutCategory     String
+  movementCategory    String
+  kind                String
+  repRangeLow         Int?
+  repRangeHigh        Int?
+  defaultIncrementLb  Float?
+  isCustom            Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  workoutExercises WorkoutExercise[]
+  goals            Goal[]
+  preferences      ExercisePreference[]
+
+  @@unique([userId, name])
+}
+
+// Learned signal per exercise: priority + how often it's been removed/selected,
+// feeds the "recommend less often if consistently removed" rule.
+model ExercisePreference {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId        String
+  exercise          Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  priority          String    @default("MEDIUM") // HIGH | MEDIUM | LOW
+  timesRemoved      Int       @default(0)
+  timesSelected     Int       @default(0)
+  lastRecommendedAt DateTime?
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([userId, exerciseId])
+}
+
+// ---------------------------------------------------------------------------
+// Goals & milestones
+// ---------------------------------------------------------------------------
+
+model Goal {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId    String?
+  exercise      Exercise? @relation(fields: [exerciseId], references: [id])
+  category      String // "glutes_legs" | "chest_triceps" | "back_biceps" | "abs" | "cardio"
+  title         String // exercise name, or a freeform goal title like "First 5K"
+  unit          String // "lb" | "min" | "mi" | "count"
+  startingValue Float
+  currentBest   Float
+  targetValue   Float
+  priority      String    @default("MEDIUM") // HIGH | MEDIUM | LOW
+  status        String    @default("ACTIVE") // ACTIVE | COMPLETED
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  milestones GoalMilestone[]
+
+  @@index([userId, status])
+}
+
+model GoalMilestone {
+  id         String    @id @default(uuid())
+  goalId     String
+  goal       Goal      @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  value      Float
+  order      Int
+  achievedAt DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// Calendar / scheduling
+// ---------------------------------------------------------------------------
+
+// status: PLANNED | IN_PROGRESS | COMPLETED | MISSED
+// createdBy: "AI" | "USER"
+model WorkoutEvent {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutTypeId String
+  workoutType   WorkoutType @relation(fields: [workoutTypeId], references: [id])
+  scheduledDate DateTime
+  status        String      @default("PLANNED")
+  createdBy     String      @default("AI")
+  workoutId     String?     @unique
+  workout       Workout?    @relation(fields: [workoutId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userId, scheduledDate])
+}
+
+// ---------------------------------------------------------------------------
+// Completed workouts (the training journal)
+// ---------------------------------------------------------------------------
+
+model Workout {
+  id              String      @id @default(uuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutTypeId   String
+  workoutType     WorkoutType @relation(fields: [workoutTypeId], references: [id])
+  date            DateTime
+  durationMinutes Int
+  aiBriefText     String?
+  aiRecapText     String?
+  notes           String?
+
+  // Cardio-specific metrics (null for weightlifting/fun workouts)
+  cardioIndoorOutdoor String?
+  cardioTimeSeconds   Int?
+  cardioDistanceMiles Float?
+
+  createdAt DateTime @default(now())
+
+  event     WorkoutEvent?
+  exercises WorkoutExercise[]
+
+  @@index([userId, date])
+}
+
+model WorkoutExercise {
+  id               String   @id @default(uuid())
+  workoutId        String
+  workout          Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exerciseId       String
+  exercise         Exercise @relation(fields: [exerciseId], references: [id])
+  orderIndex       Int
+  movementCategory String
+  reasonSelected   String?
+  warmupWeight     Float?
+  warmupReps       Int?
+
+  sets WorkoutSet[]
+}
+
+model WorkoutSet {
+  id                    String          @id @default(uuid())
+  workoutExerciseId     String
+  workoutExercise       WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
+  setNumber             Int
+  recommendedWeight     Float?
+  actualWeight          Float?
+  recommendedRepsLow    Int?
+  recommendedRepsHigh   Int?
+  actualReps            Int?
+  matchedRecommendation Boolean?
+  notes                 String?
+}
+
+// ---------------------------------------------------------------------------
+// Achievements, body weight, and the AI coach's memory
+// ---------------------------------------------------------------------------
+
+// type: PR | GOAL_COMPLETED | STREAK | MILESTONE_COUNT | OTHER
+model Achievement {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              String
+  title             String
+  description       String?
+  achievedAt        DateTime @default(now())
+  relatedExerciseId String?
+  relatedGoalId     String?
+
+  @@index([userId, achievedAt])
+}
+
+model BodyWeightLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime
+  weightLb  Float
+  createdAt DateTime @default(now())
+
+  @@index([userId, date])
+}
+
+// Alex's memory system. type: PERMANENT | ADAPTIVE | SHORT_TERM
+// valueJson holds a JSON-encoded payload whose shape depends on `key`
+// (e.g. key="scheduling_pattern:pickleball" -> { dayOfWeek, everyNWeeks, confidence }).
+model CoachMemory {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  type      String
+  valueJson String
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+}
+
+// Cached AI-generated copy so Claude isn't re-called on every page view.
+// category: "home_insight" | "workout_brief" | "workout_recap" | "goal_forecast" | "progress_overview" | "goal_suggestion"
+model CoachInsight {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category         String
+  text             String
+  factsJson        String?
+  generatedAt      DateTime @default(now())
+  relatedWorkoutId String?
+  relatedGoalId    String?
+
+  @@index([userId, category, generatedAt])
+}

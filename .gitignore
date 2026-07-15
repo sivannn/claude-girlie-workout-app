@@ -1,0 +1,11 @@
+node_modules
+.next
+*.tsbuildinfo
+# Keep environment variables out of version control
+.env
+
+/src/generated/prisma
+
+# SQLite database
+/prisma/dev.db
+/prisma/dev.db-journal

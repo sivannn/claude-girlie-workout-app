@@ -1,26 +1,175 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* Premium dark-first theme (WHOOP-inspired): near-black neutrals with
+   burgundy/deep-red as the primary action color and purple reserved for
+   Alex, the AI coach. The app forces `.dark` on <html> — see layout.tsx —
+   since the product is designed primarily for dark mode, not toggled. */
+.dark {
+  --background: oklch(0.13 0.008 289);
+  --foreground: oklch(0.96 0.004 289);
+  --card: oklch(0.18 0.01 289);
+  --card-foreground: oklch(0.96 0.004 289);
+  --popover: oklch(0.19 0.011 289);
+  --popover-foreground: oklch(0.96 0.004 289);
+  --primary: oklch(0.47 0.16 19);
+  --primary-foreground: oklch(0.98 0.005 90);
+  --secondary: oklch(0.24 0.012 289);
+  --secondary-foreground: oklch(0.96 0.004 289);
+  --muted: oklch(0.22 0.01 289);
+  --muted-foreground: oklch(0.67 0.015 289);
+  --accent: oklch(0.52 0.15 300);
+  --accent-foreground: oklch(0.98 0.005 90);
+  --destructive: oklch(0.62 0.21 25);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.55 0.14 300);
+  --chart-1: oklch(0.55 0.16 19);
+  --chart-2: oklch(0.52 0.15 300);
+  --chart-3: oklch(0.6 0.12 200);
+  --chart-4: oklch(0.66 0.02 289);
+  --chart-5: oklch(0.7 0.14 55);
+  --sidebar: oklch(0.15 0.009 289);
+  --sidebar-foreground: oklch(0.96 0.004 289);
+  --sidebar-primary: oklch(0.47 0.16 19);
+  --sidebar-primary-foreground: oklch(0.98 0.005 90);
+  --sidebar-accent: oklch(0.24 0.012 289);
+  --sidebar-accent-foreground: oklch(0.96 0.004 289);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.55 0.14 300);
+
+  /* Text color used on top of a filled category color (mid-lightness swatches
+     read better with a near-black label than off-white). */
+  --cat-on-fill: oklch(0.16 0.01 289);
+
+  /* Level 1: base color family per workout category */
+  --cat-family-weightlifting: oklch(0.5 0.15 19);
+  --cat-family-cardio: oklch(0.58 0.12 205);
+  --cat-family-fun: oklch(0.6 0.13 300);
+  --cat-family-recovery: oklch(0.66 0.02 285);
+
+  /* Level 2: Weightlifting (A) shades */
+  --cat-glutes-legs: oklch(0.58 0.17 19);
+  --cat-chest-triceps: oklch(0.5 0.15 8);
+  --cat-back-biceps: oklch(0.44 0.13 32);
+  --cat-abs: oklch(0.62 0.1 15);
+
+  /* Level 2: Cardio (B) shades */
+  --cat-running: oklch(0.62 0.13 205);
+  --cat-incline-walking: oklch(0.56 0.12 215);
+  --cat-stairs: oklch(0.5 0.11 195);
+  --cat-swimming: oklch(0.58 0.135 225);
+  --cat-cycling: oklch(0.66 0.11 198);
+
+  /* Level 2: Fun / Lifestyle (C) shades */
+  --cat-yoga: oklch(0.63 0.13 305);
+  --cat-pilates: oklch(0.56 0.145 293);
+  --cat-pickleball: oklch(0.69 0.12 318);
+  --cat-hiking: oklch(0.6 0.1 282);
+
+  /* Level 2: Recovery / Maintenance (D) shades */
+  --cat-mobility: oklch(0.7 0.02 285);
+  --cat-stretching: oklch(0.64 0.02 285);
+  --cat-light-walk: oklch(0.75 0.015 285);
+  --cat-rehab: oklch(0.58 0.02 285);
+
+  /* Generic fallback shades for user-created "Other" workout types */
+  --cat-custom-weightlifting: oklch(0.5 0.1 19);
+  --cat-custom-cardio: oklch(0.56 0.09 205);
+  --cat-custom-fun: oklch(0.58 0.09 300);
+  --cat-custom-recovery: oklch(0.62 0.015 285);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }
