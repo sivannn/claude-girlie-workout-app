@@ -50,6 +50,7 @@ export type EngineWorkoutSummary = {
   category: WorkoutCategory;
   colorKey: string;
   trainingCategory: TrainingCategory | null; // null for FUN/RECOVERY types without a strength-training bucket
+  durationMinutes?: number;
 };
 
 export type EngineWorkoutType = {

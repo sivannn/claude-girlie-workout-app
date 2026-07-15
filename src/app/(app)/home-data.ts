@@ -26,6 +26,7 @@ async function getRecentWorkoutSummaries(userId: string): Promise<EngineWorkoutS
     category: w.workoutType.category as WorkoutCategory,
     colorKey: w.workoutType.colorKey,
     trainingCategory: null,
+    durationMinutes: w.durationMinutes,
   }));
 }
 

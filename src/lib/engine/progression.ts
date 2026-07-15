@@ -56,6 +56,30 @@ function wasVoluntaryReduction(
 }
 
 /**
+ * "How aggressively the user likes to progress" (adaptive memory): looks at
+ * whether the user has tended to enter heavier or lighter actual weights
+ * than what was recommended, and nudges future increment size accordingly.
+ * Neutral (1x) without enough signal; bounded so it can never suppress or
+ * runaway the increment.
+ */
+function computeAggressivenessMultiplier(sessions: EngineExerciseSession[]): number {
+  const sets = sessions
+    .flatMap((s) => s.sets)
+    .filter((s) => s.actualWeight != null && s.recommendedWeight != null) as Array<{
+    actualWeight: number;
+    recommendedWeight: number;
+  }>;
+  if (sets.length < 4) return 1;
+
+  const avgDelta = sets.reduce((sum, s) => sum + (s.actualWeight - s.recommendedWeight), 0) / sets.length;
+  return 1 + Math.max(-0.4, Math.min(0.6, avgDelta / 25));
+}
+
+function roundIncrementToNearestHalf(value: number): number {
+  return Math.max(2.5, Math.round(value / 2.5) * 2.5);
+}
+
+/**
  * Counts consecutive most-recent sessions (starting at index 0) that were a
  * genuine attempt (not a voluntary reduction) but failed to reach the top of
  * the rep range. Stops at the first progression, voluntary reduction, or gap.
@@ -167,14 +191,18 @@ export function decideProgression(
   }
 
   if (reachedTopOfRange(lastWorkingSets, repHigh)) {
-    const nextWeight = lastWeight + increment;
+    // Older sessions (excluding the one just evaluated above) signal how
+    // aggressively this user tends to push past what's recommended.
+    const aggressiveness = computeAggressivenessMultiplier(recentSessions.slice(1));
+    const adjustedIncrement = roundIncrementToNearestHalf(increment * aggressiveness);
+    const nextWeight = lastWeight + adjustedIncrement;
     return {
       recommendedWeight: nextWeight,
       recommendedRepsLow: repLow,
       recommendedRepsHigh: repHigh,
       warmupWeight: roundToIncrement(nextWeight * 0.5, 5),
       warmupReps: 10,
-      reason: `You hit the top of your rep range on every set last time, so today adds ${increment} lb.`,
+      reason: `You hit the top of your rep range on every set last time, so today adds ${adjustedIncrement} lb.`,
       isDeload: false,
       isFirstTime: false,
     };

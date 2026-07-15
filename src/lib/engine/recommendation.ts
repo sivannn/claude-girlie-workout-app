@@ -118,8 +118,26 @@ export function recommendNextWorkout(
   return {
     workoutType: winner.type,
     reason,
-    estimatedDurationMinutes: DEFAULT_DURATION_MINUTES[winner.type.category] ?? 45,
+    estimatedDurationMinutes: typicalDurationFor(winner.type, recentWorkouts),
   };
+}
+
+const DURATION_HISTORY_SESSIONS = 5;
+
+/**
+ * "Preferred workout length" (adaptive memory): once there's enough recent
+ * history for this exact workout type, use the user's own typical duration
+ * instead of the generic category default.
+ */
+function typicalDurationFor(type: EngineWorkoutType, recentWorkouts: EngineWorkoutSummary[]): number {
+  const durations = recentWorkouts
+    .filter((w) => w.workoutTypeId === type.id && w.durationMinutes != null)
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, DURATION_HISTORY_SESSIONS)
+    .map((w) => w.durationMinutes!);
+
+  if (durations.length === 0) return DEFAULT_DURATION_MINUTES[type.category] ?? 45;
+  return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);
 }
 
 function bucketLabel(bucket: WeeklyGoalBucket | null): string {

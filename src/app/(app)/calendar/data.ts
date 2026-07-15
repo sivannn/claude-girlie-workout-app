@@ -42,6 +42,7 @@ async function computeRecommendation(userId: string): Promise<NextWorkoutRecomme
     category: w.workoutType.category as WorkoutCategory,
     colorKey: w.workoutType.colorKey,
     trainingCategory: null,
+    durationMinutes: w.durationMinutes,
   }));
   return recommendNextWorkout(
     workoutTypes as EngineWorkoutType[],

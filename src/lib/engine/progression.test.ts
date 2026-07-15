@@ -122,4 +122,48 @@ describe("decideProgression", () => {
     expect(result.recommendedRepsLow).toBe(8);
     expect(result.recommendedRepsHigh).toBe(12);
   });
+
+  describe("adaptive progression aggressiveness", () => {
+    it("takes a bigger jump for a user who consistently exceeds recommended weight", () => {
+      const history = [
+        sessionAgo(7, [{ weight: 135, reps: 10 }, { weight: 135, reps: 10 }, { weight: 135, reps: 10 }]),
+        sessionAgo(14, [
+          { weight: 130, reps: 10, recWeight: 120 },
+          { weight: 130, reps: 10, recWeight: 120 },
+          { weight: 130, reps: 10, recWeight: 120 },
+        ]),
+        sessionAgo(21, [
+          { weight: 120, reps: 10, recWeight: 110 },
+          { weight: 120, reps: 10, recWeight: 110 },
+          { weight: 120, reps: 10, recWeight: 110 },
+        ]),
+      ];
+      const result = decideProgression(squat, history, asOf);
+      expect(result.recommendedWeight).toBeGreaterThan(140); // more than the neutral +5 lb
+    });
+
+    it("stays at the neutral increment without enough history to establish a pattern", () => {
+      const history = [sessionAgo(7, [{ weight: 135, reps: 10 }, { weight: 135, reps: 10 }, { weight: 135, reps: 10 }])];
+      const result = decideProgression(squat, history, asOf);
+      expect(result.recommendedWeight).toBe(140); // exactly the default +5 lb increment
+    });
+
+    it("never lets aggressiveness collapse the increment to zero or negative", () => {
+      const history = [
+        sessionAgo(7, [{ weight: 135, reps: 10 }, { weight: 135, reps: 10 }, { weight: 135, reps: 10 }]),
+        sessionAgo(14, [
+          { weight: 100, reps: 10, recWeight: 130 },
+          { weight: 100, reps: 10, recWeight: 130 },
+          { weight: 100, reps: 10, recWeight: 130 },
+        ]),
+        sessionAgo(21, [
+          { weight: 95, reps: 10, recWeight: 125 },
+          { weight: 95, reps: 10, recWeight: 125 },
+          { weight: 95, reps: 10, recWeight: 125 },
+        ]),
+      ];
+      const result = decideProgression(squat, history, asOf);
+      expect(result.recommendedWeight).toBeGreaterThan(135); // still progresses, just conservatively
+    });
+  });
 });
