@@ -468,10 +468,11 @@ async function completeWeightliftingWorkout(
           title: `${name} PR: ${sessionBest} lb`,
           description: `New heaviest working weight for ${name}.`,
           relatedExerciseId: e.exerciseId,
+          relatedWorkoutId: workout.id,
           achievedAt: now,
         },
       });
-      await applyGoalProgress(userId, e.exerciseId, sessionBest, now);
+      await applyGoalProgress(userId, e.exerciseId, sessionBest, now, workout.id);
     } else {
       const lastSession = histories.get(e.exerciseId)?.[0];
       const lastBest = lastSession
@@ -520,7 +521,13 @@ async function getPriorBestWeights(userId: string, exerciseIds: string[]): Promi
   return bests;
 }
 
-async function applyGoalProgress(userId: string, exerciseId: string, newBest: number, now: Date) {
+async function applyGoalProgress(
+  userId: string,
+  exerciseId: string,
+  newBest: number,
+  now: Date,
+  workoutId: string
+) {
   const goal = await prisma.goal.findFirst({
     where: { userId, exerciseId, status: "ACTIVE" },
     include: { milestones: true },
@@ -546,6 +553,7 @@ async function applyGoalProgress(userId: string, exerciseId: string, newBest: nu
         type: "GOAL_COMPLETED",
         title: `${goal.title} goal reached: ${goal.targetValue} ${goal.unit}`,
         relatedGoalId: goal.id,
+        relatedWorkoutId: workoutId,
         achievedAt: now,
       },
     });
@@ -586,6 +594,7 @@ async function completeCardioWorkout(
         userId,
         type: "PR",
         title: `${workoutTypeName} PR: ${payload.distanceMiles} mi`,
+        relatedWorkoutId: workout.id,
         achievedAt: now,
       },
     });

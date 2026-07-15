@@ -260,8 +260,10 @@ model Achievement {
   achievedAt        DateTime @default(now())
   relatedExerciseId String?
   relatedGoalId     String?
+  relatedWorkoutId  String?
 
   @@index([userId, achievedAt])
+  @@index([relatedWorkoutId])
 }
 
 model BodyWeightLog {
