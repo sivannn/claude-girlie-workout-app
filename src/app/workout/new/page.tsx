@@ -1,6 +1,9 @@
 import { getWorkoutTypes } from "./actions";
 import { StartWorkoutFlow } from "./StartWorkoutFlow";
 
+// Reads live exercise/workout-type data from the database on every visit.
+export const dynamic = "force-dynamic";
+
 export default async function StartWorkoutPage({
   searchParams,
 }: {

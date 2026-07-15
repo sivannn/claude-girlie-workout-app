@@ -2,6 +2,7 @@
 
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parseLocalDateInput } from "@/lib/utils/date";
 
 /** Missed-workout reschedule: remove the missed event, create a new planned one at the chosen date. */
 export async function rescheduleEvent(eventId: string, newDate: string) {
@@ -16,7 +17,7 @@ export async function rescheduleEvent(eventId: string, newDate: string) {
       data: {
         userId: user.id,
         workoutTypeId: event.workoutTypeId,
-        scheduledDate: new Date(newDate),
+        scheduledDate: parseLocalDateInput(newDate),
         status: "PLANNED",
         createdBy: "USER",
       },

@@ -1,8 +1,10 @@
 import "server-only";
+import { endOfDay } from "date-fns";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getStreakStatus } from "@/lib/engine";
 import { movementCategoryLabel } from "@/lib/data/movement-labels";
+import { parseLocalDateInput } from "@/lib/utils/date";
 import type { WorkoutCategory } from "@/lib/types/enums";
 
 export type HistoryFilters = {
@@ -196,8 +198,14 @@ export async function getHistoryPageData(filters: HistoryFilters) {
   if (filters.workoutTypeId) items = items.filter((w) => w.workoutTypeId === filters.workoutTypeId);
   if (filters.category) items = items.filter((w) => w.category === filters.category);
   if (filters.prOnly) items = items.filter((w) => w.hasPR);
-  if (filters.dateFrom) items = items.filter((w) => w.date >= new Date(filters.dateFrom!));
-  if (filters.dateTo) items = items.filter((w) => w.date <= new Date(filters.dateTo!));
+  if (filters.dateFrom) {
+    const from = parseLocalDateInput(filters.dateFrom);
+    items = items.filter((w) => w.date >= from);
+  }
+  if (filters.dateTo) {
+    const to = endOfDay(parseLocalDateInput(filters.dateTo));
+    items = items.filter((w) => w.date <= to);
+  }
 
   return {
     items,

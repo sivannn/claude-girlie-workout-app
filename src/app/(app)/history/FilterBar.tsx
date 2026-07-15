@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const CATEGORY_OPTIONS = [
   { value: "WEIGHTLIFTING", label: "Strength" },
@@ -72,6 +73,24 @@ export function FilterBar({
       >
         PRs only
       </Button>
+
+      <div className="flex items-center gap-1.5">
+        <Input
+          type="date"
+          value={searchParams.get("dateFrom") ?? ""}
+          onChange={(e) => setParam("dateFrom", e.target.value || null)}
+          className="h-9 w-[9.5rem]"
+          aria-label="From date"
+        />
+        <span className="text-xs text-muted-foreground">to</span>
+        <Input
+          type="date"
+          value={searchParams.get("dateTo") ?? ""}
+          onChange={(e) => setParam("dateTo", e.target.value || null)}
+          className="h-9 w-[9.5rem]"
+          aria-label="To date"
+        />
+      </div>
 
       {hasFilters ? (
         <Button variant="ghost" size="sm" onClick={() => router.push("/history")}>
