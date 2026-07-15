@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import PyPDF2\")",
+      "Bash(python3 -c \"import pypdf\")",
+      "Bash(python3 -c \"import fitz\")",
+      "Bash(brew install *)",
+      "Bash(pdftotext -layout \"/Users/sivanlevy/Desktop/ClaudeWorkoutApp/Claude Girlie Workout App.pdf\" \"/private/tmp/claude-501/-Users-sivanlevy-Desktop-ClaudeWorkoutApp/10da45a3-22d1-48f3-9ff8-cc4695828e19/scratchpad/spec.txt\")"
+    ]
+  }
+}
