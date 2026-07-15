@@ -97,8 +97,10 @@ export function forecastGoalCompletion(
   const projectedDaysFromNow =
     latestDaysFromStart + daysNeededFromLatestPoint - currentDaysFromStart;
 
-  const estimatedWeeks = Math.max(0, Math.round(projectedDaysFromNow / 7));
-  const estimatedMonths = Math.max(0, Math.round(projectedDaysFromNow / 30.4));
+  // The goal isn't reached yet (remaining > 0 above), so never report 0 —
+  // that reads as "already there." Floor to at least 1 week out.
+  const estimatedWeeks = Math.max(1, Math.round(projectedDaysFromNow / 7));
+  const estimatedMonths = Math.max(1, Math.round(projectedDaysFromNow / 30.4));
 
   return { estimatedWeeks, estimatedMonths };
 }

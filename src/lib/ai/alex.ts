@@ -168,27 +168,56 @@ Return only the rephrased reason, no preamble.`;
 export type GoalSuggestionContext = {
   userRequest: string;
   topPriorityCategory: string | null;
-  candidateExercises: string[]; // exercise names available to suggest from
+  candidateExercises: Array<{ name: string; workoutCategory: string }>;
 };
+
+// Deterministic keyword -> training-category matcher, used both to keep the
+// AI prompt honest (it still has to pick from the matching candidates) and
+// as the fallback when no API key is configured, so natural-language goal
+// creation degrades gracefully instead of returning an arbitrary exercise.
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  glutes_legs: ["glute", "leg", "squat", "hip", "thigh", "quad", "hamstring", "calf", "calves"],
+  chest_triceps: ["chest", "tricep", "bench", "press", "pec", "shoulder"],
+  back_biceps: ["back", "bicep", "pull", "lat", "row"],
+  abs: ["ab", "core", "stomach"],
+  cardio: ["run", "cardio", "5k", "10k", "mile", "endurance", "stamina", "marathon"],
+};
+
+function keywordMatchCandidates(
+  userRequest: string,
+  candidates: Array<{ name: string; workoutCategory: string }>
+): Array<{ name: string; workoutCategory: string }> {
+  const lower = userRequest.toLowerCase();
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some((k) => lower.includes(k))) {
+      const matches = candidates.filter((c) => c.workoutCategory === category);
+      if (matches.length) return matches;
+    }
+  }
+  return candidates;
+}
 
 export async function interpretGoalRequest(
   context: GoalSuggestionContext
 ): Promise<{ exerciseName: string | null; explanation: string }> {
+  const matched = keywordMatchCandidates(context.userRequest, context.candidateExercises);
+  const names = matched.map((c) => c.name);
+
   if (!client) {
     return {
-      exerciseName: context.candidateExercises[0] ?? null,
+      exerciseName: names[0] ?? null,
       explanation:
         "Based on your request, here's a goal to consider — feel free to customize the exercise or target.",
     };
   }
   const prompt = `The user described a fitness goal in their own words: "${context.userRequest}".
 Their top training priority is: ${context.topPriorityCategory ?? "not set"}.
-Choose the single best-matching exercise from this exact list (respond with the exact name from the list, or "none" if nothing fits): ${context.candidateExercises.join(", ")}.
+Choose the single best-matching exercise from this exact list (respond with the exact name from the list, or "none" if nothing fits): ${names.join(", ")}.
 Then write a 1-sentence explanation of why, in your voice as Alex.
 Respond in exactly this format:
 EXERCISE: <exact exercise name or none>
 EXPLANATION: <one sentence>`;
-  const fallback = `EXERCISE: ${context.candidateExercises[0] ?? "none"}\nEXPLANATION: Based on your request, here's a goal to consider — feel free to customize the exercise or target.`;
+  const fallback = `EXERCISE: ${names[0] ?? "none"}\nEXPLANATION: Based on your request, here's a goal to consider — feel free to customize the exercise or target.`;
   const result = await askAlex(prompt, fallback);
 
   const exerciseMatch = result.match(/EXERCISE:\s*(.+)/i);
@@ -201,4 +230,25 @@ EXPLANATION: <one sentence>`;
       explanationMatch?.[1]?.trim() ??
       "Based on your request, here's a goal to consider — feel free to customize the exercise or target.",
   };
+}
+
+// ---------------------------------------------------------------------------
+// Goal completion — proactively suggest the next goal after one is reached
+// ---------------------------------------------------------------------------
+
+export type GoalCompletionFacts = {
+  exerciseName: string;
+  achievedTarget: number;
+  unit: string;
+  suggestedNext: number;
+};
+
+export async function generateGoalCompletionSuggestion(facts: GoalCompletionFacts): Promise<string> {
+  const fallback = `Congratulations! You reached your ${facts.exerciseName} goal of ${facts.achievedTarget} ${facts.unit}. Based on your recent progress, I recommend increasing your next goal to ${facts.suggestedNext} ${facts.unit}.`;
+  const prompt = `The user just reached a goal. Write a short (1-2 sentence) congratulations in your voice as Alex, then propose the next goal. Do not add any numbers beyond what's given.
+Exercise: ${facts.exerciseName}
+Goal reached: ${facts.achievedTarget} ${facts.unit}
+Suggested next goal: ${facts.suggestedNext} ${facts.unit}
+Return only the message, no preamble.`;
+  return askAlex(prompt, fallback);
 }
