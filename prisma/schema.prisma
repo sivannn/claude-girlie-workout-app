@@ -57,6 +57,10 @@ model UserPreferences {
   topPriorityCategory   String? // e.g. "glutes_legs" - highest fitness priority, informs exercise selection
   onboardingCompletedAt DateTime?
 
+  // Collected during onboarding to calibrate first-workout starting weights.
+  experienceLevel String? // "new" | "under_1_year" | "one_to_three_years" | "three_plus_years"
+  bodyWeightLb    Float?
+
   createdAt DateTime @updatedAt
   updatedAt DateTime @updatedAt
 }

@@ -137,7 +137,9 @@ function bucketLabel(bucket: WeeklyGoalBucket | null): string {
   }
 }
 
-export function trainingCategoryForWorkoutType(type: EngineWorkoutType): TrainingCategory | null {
+export function trainingCategoryForWorkoutType(
+  type: EngineWorkoutType
+): Extract<TrainingCategory, "glutes_legs" | "chest_triceps" | "back_biceps"> | null {
   const category = trainingCategoryOf(type.colorKey);
   return category && isLiftingTrainingCategory(category) ? category : null;
 }

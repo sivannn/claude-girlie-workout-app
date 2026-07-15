@@ -95,3 +95,11 @@ export type CoachInsightCategory = (typeof COACH_INSIGHT_CATEGORIES)[number];
 
 export const UNIT_SYSTEMS = ["imperial", "metric"] as const;
 export type UnitSystem = (typeof UNIT_SYSTEMS)[number];
+
+export const EXPERIENCE_LEVELS = [
+  "new",
+  "under_1_year",
+  "one_to_three_years",
+  "three_plus_years",
+] as const;
+export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number];

@@ -8,3 +8,4 @@ export * from "./goals";
 export * from "./weeklyGoals";
 export * from "./monthlyGoals";
 export * from "./streaks";
+export * from "./startingWeights";
