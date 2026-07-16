@@ -67,12 +67,17 @@ export default async function HomePage() {
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">Weekly Goals</h2>
-        <div className="divide-y divide-border rounded-xl border border-border">
+        <div className="flex flex-col gap-2">
           {WEEKLY_GOAL_BUCKETS.map((bucket) => {
             const status = data.weeklyStatus[bucket];
             const isRecommended = data.recommendedBucket === bucket && !status.completed;
             return (
-              <div key={bucket} className="flex items-center justify-between gap-3 px-4 py-3">
+              <div
+                key={bucket}
+                className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
+                  status.completed ? "tile-dark" : "tile"
+                }`}
+              >
                 <div className="flex items-center gap-2.5">
                   <span
                     className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${
@@ -121,7 +126,7 @@ export default async function HomePage() {
         />
       </section>
 
-      <section className="grid grid-cols-2 gap-4 rounded-xl border border-border p-4">
+      <section className="tile grid grid-cols-2 gap-4 rounded-xl border p-4">
         <StatDisplay
           value={`${data.streakStatus.currentStreak}`}
           label="Current Streak"
@@ -141,7 +146,7 @@ export default async function HomePage() {
           <h2 className="text-sm font-semibold text-foreground">Recent Wins</h2>
           <div className="flex flex-col gap-2">
             {data.recentAchievements.map((a) => (
-              <div key={a.id} className="flex items-start gap-3 rounded-xl border border-border p-3">
+              <div key={a.id} className="tile flex items-start gap-3 rounded-xl border p-3">
                 <span className="text-lg leading-none">{ACHIEVEMENT_ICON[a.type] ?? "⭐"}</span>
                 <div>
                   <p className="text-sm font-medium text-foreground">{a.title}</p>

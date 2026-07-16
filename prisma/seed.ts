@@ -1,13 +1,21 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaLibSql } from "@prisma/adapter-libsql";
 import path from "node:path";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { EXERCISE_LIBRARY } from "../src/lib/data/exercises";
 import { WORKOUT_TYPE_LIBRARY } from "../src/lib/data/workout-types";
 
-const dbPath = path.join(process.cwd(), "prisma", "dev.db");
-const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: dbPath }),
-});
+// Same env-driven adapter choice as src/lib/prisma.ts, so `npm run db:seed`
+// can target either the local dev.db or the deployed Turso database.
+const adapter = process.env.TURSO_DATABASE_URL
+  ? new PrismaLibSql({
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    })
+  : new PrismaBetterSqlite3({
+      url: path.join(process.cwd(), "prisma", "dev.db"),
+    });
+const prisma = new PrismaClient({ adapter });
 
 const DEFAULT_USER_EMAIL = "sivsivlevy@gmail.com";
 
@@ -74,6 +82,7 @@ async function main() {
         repRangeLow: ex.repRangeLow,
         repRangeHigh: ex.repRangeHigh,
         defaultIncrementLb: ex.defaultIncrementLb,
+        equipment: ex.equipment,
       },
       create: {
         userId: user.id,
@@ -84,6 +93,7 @@ async function main() {
         repRangeLow: ex.repRangeLow,
         repRangeHigh: ex.repRangeHigh,
         defaultIncrementLb: ex.defaultIncrementLb,
+        equipment: ex.equipment,
         isCustom: false,
       },
     });

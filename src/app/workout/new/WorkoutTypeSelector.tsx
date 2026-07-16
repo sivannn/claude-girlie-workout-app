@@ -85,7 +85,7 @@ export function WorkoutTypeSelector({
                 key={type.id}
                 type="button"
                 onClick={() => onSelect(type.id)}
-                className="flex flex-col gap-2 rounded-xl border border-border p-4 text-left transition-colors hover:bg-secondary"
+                className="tile flex flex-col gap-2 rounded-xl border p-4 text-left transition-colors hover:bg-secondary"
               >
                 <span
                   className="h-2 w-8 rounded-full"

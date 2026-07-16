@@ -26,6 +26,16 @@ export const CATEGORY_FAMILY_LABEL: Record<WorkoutCategory, string> = {
   RECOVERY: "Recovery / Maintenance",
 };
 
+// Most category anchors are medium-to-dark, so light text is the readable
+// default on a filled swatch — except Cardio's Cool Sky, the one light
+// anchor, which needs dark text for real contrast.
+const CATEGORY_FAMILY_ON_FILL: Record<WorkoutCategory, string> = {
+  WEIGHTLIFTING: "--cat-on-fill-light",
+  CARDIO: "--cat-on-fill-dark",
+  FUN: "--cat-on-fill-light",
+  RECOVERY: "--cat-on-fill-light",
+};
+
 export type SubtypeMeta = {
   /** CSS custom property name (without var()) holding this subtype's shade */
   cssVar: string;
@@ -81,6 +91,11 @@ export function categoryFamily(colorKey: string): WorkoutCategory {
   return SUBTYPE_META[colorKey]?.family ?? "RECOVERY";
 }
 
+/** The correct-contrast text color to use on top of a filled category swatch. */
+export function categoryOnFillVar(colorKey: string): string {
+  return `var(${CATEGORY_FAMILY_ON_FILL[categoryFamily(colorKey)]})`;
+}
+
 /**
  * Visual treatment per Workout Event state (Calendar spec):
  * Planned = outlined, Completed = solid filled, Missed = faded/desaturated
@@ -91,11 +106,12 @@ export function eventStatusStyle(
   status: EventStatus
 ): { background: string; border: string; color: string; opacity?: number } {
   const color = categoryColorVar(colorKey);
+  const onFill = categoryOnFillVar(colorKey);
   switch (status) {
     case "COMPLETED":
-      return { background: color, border: color, color: "var(--cat-on-fill)" };
+      return { background: color, border: color, color: onFill };
     case "IN_PROGRESS":
-      return { background: color, border: color, color: "var(--cat-on-fill)" };
+      return { background: color, border: color, color: onFill };
     case "MISSED":
       return { background: "transparent", border: color, color, opacity: 0.45 };
     case "PLANNED":

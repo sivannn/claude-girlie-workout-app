@@ -103,3 +103,49 @@ export const EXPERIENCE_LEVELS = [
   "three_plus_years",
 ] as const;
 export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number];
+
+// Collected during onboarding to personalize goal-setting.
+export const PRIMARY_GOALS = [
+  "build_muscle",
+  "lose_fat",
+  "build_strength",
+  "stay_active",
+  "other",
+] as const;
+export type PrimaryGoal = (typeof PRIMARY_GOALS)[number];
+
+// Common workout types a user might enjoy, collected during onboarding.
+export const WORKOUT_PREFERENCES = [
+  "weightlifting",
+  "pilates",
+  "yoga",
+  "running",
+  "hiking",
+  "cycling",
+  "swimming",
+  "sports",
+  "other",
+] as const;
+export type WorkoutPreference = (typeof WORKOUT_PREFERENCES)[number];
+
+// Where the user typically trains - drives which exercises are recommended
+// based on realistically available equipment.
+export const EQUIPMENT_ACCESS_OPTIONS = [
+  "commercial_gym",
+  "home_gym",
+  "apartment_gym",
+  "bodyweight_only",
+] as const;
+export type EquipmentAccess = (typeof EQUIPMENT_ACCESS_OPTIONS)[number];
+
+// What an exercise requires - filtered against a user's equipmentAccess so
+// recommendations only include exercises they can actually perform.
+export const EQUIPMENT_TYPES = [
+  "barbell",
+  "dumbbell",
+  "cable",
+  "machine",
+  "bodyweight",
+  "bands",
+] as const;
+export type EquipmentType = (typeof EQUIPMENT_TYPES)[number];

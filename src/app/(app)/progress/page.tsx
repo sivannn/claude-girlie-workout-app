@@ -51,7 +51,7 @@ export default async function ProgressPage() {
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-foreground">Consistency</h2>
-          <div className="grid grid-cols-2 gap-4 rounded-xl border border-border p-4 sm:grid-cols-4">
+          <div className="tile grid grid-cols-2 gap-4 rounded-xl border p-4 sm:grid-cols-4">
             <StatDisplay value={String(data.consistency.currentStreak)} label="Current Streak" size="sm" />
             <StatDisplay value={String(data.consistency.longestStreak)} label="Longest Streak" size="sm" />
             <StatDisplay
@@ -84,13 +84,13 @@ export default async function ProgressPage() {
             <h2 className="text-sm font-semibold text-foreground">Personal Records</h2>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {data.personalRecords.strength.map((pr) => (
-                <div key={pr.name} className="rounded-xl border border-border p-3">
+                <div key={pr.name} className="tile rounded-xl border p-3">
                   <p className="text-xs text-muted-foreground">{pr.name}</p>
                   <p className="text-sm font-semibold text-foreground">{pr.best} lb</p>
                 </div>
               ))}
               {data.personalRecords.cardio.map((pr) => (
-                <div key={pr.name} className="rounded-xl border border-border p-3">
+                <div key={pr.name} className="tile rounded-xl border p-3">
                   <p className="text-xs text-muted-foreground">{pr.name}</p>
                   <p className="text-sm font-semibold text-foreground">{pr.best} mi</p>
                 </div>
@@ -104,7 +104,7 @@ export default async function ProgressPage() {
             <h2 className="text-sm font-semibold text-foreground">Milestones</h2>
             <div className="flex flex-col gap-2">
               {data.milestones.map((m) => (
-                <div key={m.id} className="flex items-start gap-3 rounded-xl border border-border p-3">
+                <div key={m.id} className="tile flex items-start gap-3 rounded-xl border p-3">
                   <span className="text-lg leading-none">{ACHIEVEMENT_ICON[m.type] ?? "⭐"}</span>
                   <div>
                     <p className="text-sm font-medium text-foreground">{m.title}</p>

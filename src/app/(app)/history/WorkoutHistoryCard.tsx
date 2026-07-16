@@ -12,7 +12,7 @@ export function WorkoutHistoryCard({ workout }: { workout: WorkoutListItem }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="rounded-xl border border-border">
+    <div className="tile rounded-xl border">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}

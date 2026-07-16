@@ -11,11 +11,11 @@ export function SidebarNav() {
   return (
     <aside className="hidden md:flex md:w-60 md:flex-col md:border-r md:border-border md:bg-sidebar md:px-4 md:py-6">
       <Link href="/" className="mb-8 flex items-center gap-2 px-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-alex text-sm font-semibold text-alex-foreground">
           A
         </span>
         <span className="text-lg font-semibold tracking-tight text-sidebar-foreground">
-          Coach Alex
+          Bloom
         </span>
       </Link>
 

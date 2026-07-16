@@ -9,13 +9,25 @@ import {
   trainingCategoryForWorkoutType,
 } from "@/lib/engine";
 import type { EngineExercise, EngineExercisePreference, EngineWorkoutType } from "@/lib/engine/types";
-import type { ExperienceLevel, MovementCategory } from "@/lib/types/enums";
+import type {
+  EquipmentAccess,
+  ExperienceLevel,
+  MovementCategory,
+  PrimaryGoal,
+  TrainingCategory,
+  WorkoutPreference,
+} from "@/lib/types/enums";
 import { movementCategoryLabel } from "@/lib/data/movement-labels";
+import { filterExercisesByEquipment } from "@/lib/data/equipment";
 
 export type OnboardingInput = {
   experienceLevel: ExperienceLevel;
   bodyWeightLb: number | null;
   monthlyWorkoutTarget: number;
+  primaryGoal: PrimaryGoal;
+  musclePriorities: TrainingCategory[];
+  workoutPreferences: WorkoutPreference[];
+  equipmentAccess: EquipmentAccess;
 };
 
 export type FirstWorkoutPreview = {
@@ -38,6 +50,12 @@ export async function completeOnboarding(
       experienceLevel: input.experienceLevel,
       bodyWeightLb: input.bodyWeightLb,
       monthlyWorkoutTarget: input.monthlyWorkoutTarget,
+      primaryGoal: input.primaryGoal,
+      musclePriorities: input.musclePriorities.length > 0 ? JSON.stringify(input.musclePriorities) : null,
+      workoutPreferences:
+        input.workoutPreferences.length > 0 ? JSON.stringify(input.workoutPreferences) : null,
+      equipmentAccess: input.equipmentAccess,
+      topPriorityCategory: input.musclePriorities[0] ?? null,
       onboardingCompletedAt: new Date(),
     },
   });
@@ -73,11 +91,13 @@ export async function completeOnboarding(
   let exercises: FirstWorkoutPreview["exercises"] = [];
 
   if (trainingCategory) {
-    const [liftingExercises, abExercises, preferences] = await Promise.all([
+    const [liftingExercisesRaw, abExercisesRaw, preferences] = await Promise.all([
       prisma.exercise.findMany({ where: { userId: user.id, workoutCategory: trainingCategory } }),
       prisma.exercise.findMany({ where: { userId: user.id, workoutCategory: "abs" } }),
       prisma.exercisePreference.findMany({ where: { userId: user.id } }),
     ]);
+    const liftingExercises = filterExercisesByEquipment(liftingExercisesRaw, input.equipmentAccess);
+    const abExercises = filterExercisesByEquipment(abExercisesRaw, input.equipmentAccess);
 
     const engineExercises = [...liftingExercises, ...abExercises] as EngineExercise[];
     const startingWeightHints = new Map<string, number>();

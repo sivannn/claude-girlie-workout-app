@@ -18,17 +18,14 @@ export function AlexNote({
 }) {
   return (
     <div
-      className={cn(
-        "flex gap-3 rounded-xl border border-accent/25 bg-accent/10 p-4",
-        className
-      )}
+      className={cn("tile flex gap-3 rounded-xl border p-4", className)}
     >
-      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-accent-foreground">
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-alex text-[11px] font-semibold text-alex-foreground">
         A
       </span>
       <div className="min-w-0 flex-1">
         {title ? (
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-accent">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-alex">
             {title}
           </p>
         ) : null}

@@ -10,6 +10,10 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
+  --color-alex: var(--alex);
+  --color-alex-foreground: var(--alex-foreground);
+  --color-alex-text: var(--alex-text);
+  --color-accent-text: var(--accent-text);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -83,83 +87,124 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-/* Premium dark-first theme (WHOOP-inspired): near-black neutrals with
-   burgundy/deep-red as the primary action color and purple reserved for
-   Alex, the AI coach. The app forces `.dark` on <html> — see layout.tsx —
-   since the product is designed primarily for dark mode, not toggled. */
+/* Premium dark-first theme (WHOOP-inspired). The app forces `.dark` on
+   <html> — see layout.tsx — since the product is designed primarily for
+   dark mode, not toggled.
+
+   Custom palette (user-chosen):
+     Background  = Black Cherry  #570000
+     Text        = Powder Petal  #EDDBD4
+     Primary     = Ruby Red      #B10F2E
+     Alex        = Reddish Brown #874B37  (Alex's own color — speech notes,
+                                            the "A" avatar — kept distinct
+                                            from the general Accent so
+                                            "Alex is talking" is always
+                                            visually unambiguous)
+     Accent      = Brandy        #7A2700  (general UI highlights: nav state,
+                                            progress fills, badges, rings)
+
+   Everything else in this block is derived from those five with
+   color-mix() so the whole theme stays internally consistent if any of
+   the five ever change. */
 .dark {
-  --background: oklch(0.13 0.008 289);
-  --foreground: oklch(0.96 0.004 289);
-  --card: oklch(0.18 0.01 289);
-  --card-foreground: oklch(0.96 0.004 289);
-  --popover: oklch(0.19 0.011 289);
-  --popover-foreground: oklch(0.96 0.004 289);
-  --primary: oklch(0.47 0.16 19);
-  --primary-foreground: oklch(0.98 0.005 90);
-  --secondary: oklch(0.24 0.012 289);
-  --secondary-foreground: oklch(0.96 0.004 289);
-  --muted: oklch(0.22 0.01 289);
-  --muted-foreground: oklch(0.67 0.015 289);
-  --accent: oklch(0.52 0.15 300);
-  --accent-foreground: oklch(0.98 0.005 90);
+  --background: #570000;
+  --foreground: #eddbd4;
+  /* Tiles/boxes/cards are intentionally the *inverse* of the page: a light
+     Powder Petal surface with dark text, rather than a slightly-lighter-dark
+     surface. --card-muted-foreground/--card-border support that surface;
+     .tile (below) is how components opt into it. */
+  --card: #eddbd4;
+  --card-foreground: #570000;
+  --card-muted-foreground: color-mix(in oklch, var(--card-foreground) 60%, var(--card) 40%);
+  --card-border: color-mix(in oklch, var(--card-foreground) 28%, var(--card) 72%);
+  --card-hover: color-mix(in oklch, var(--card), black 6%);
+  --popover: var(--card);
+  --popover-foreground: var(--card-foreground);
+  --primary: #b10f2e;
+  --primary-foreground: #eddbd4;
+  --secondary: color-mix(in oklch, var(--background), white 12%);
+  --secondary-foreground: var(--foreground);
+  /* Fixed reference to the dark surface pair, independent of --secondary —
+     .tile locally re-scopes --secondary for its own hover states, so
+     .tile-dark (a "completed" row nested inside a .tile) needs its own
+     stable tokens rather than inheriting that re-scoped value. */
+  --done-bg: color-mix(in oklch, var(--background), white 12%);
+  --done-foreground: #eddbd4;
+  --muted: color-mix(in oklch, var(--background), white 10%);
+  --muted-foreground: color-mix(in oklch, var(--foreground) 65%, var(--background) 35%);
+  --accent: #7a2700;
+  --accent-foreground: #eddbd4;
+  --alex: #874b37;
+  --alex-foreground: #eddbd4;
+  /* Accent/Alex are both fairly dark, same-hue-family as the background —
+     fine as a solid fill (paired with accent/alex-foreground), but too low
+     contrast used as bare inline text on a dark surface. These lightened
+     variants keep the hue identity for that specific case. */
+  --accent-text: color-mix(in oklch, var(--accent) 55%, var(--foreground) 45%);
+  --alex-text: color-mix(in oklch, var(--alex) 55%, var(--foreground) 45%);
   --destructive: oklch(0.62 0.21 25);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.55 0.14 300);
-  --chart-1: oklch(0.55 0.16 19);
-  --chart-2: oklch(0.52 0.15 300);
-  --chart-3: oklch(0.6 0.12 200);
-  --chart-4: oklch(0.66 0.02 289);
-  --chart-5: oklch(0.7 0.14 55);
-  --sidebar: oklch(0.15 0.009 289);
-  --sidebar-foreground: oklch(0.96 0.004 289);
-  --sidebar-primary: oklch(0.47 0.16 19);
-  --sidebar-primary-foreground: oklch(0.98 0.005 90);
-  --sidebar-accent: oklch(0.24 0.012 289);
-  --sidebar-accent-foreground: oklch(0.96 0.004 289);
+  --ring: var(--accent);
+  --chart-1: var(--primary);
+  --chart-2: var(--alex);
+  --chart-3: var(--accent);
+  --chart-4: #70b1e2;
+  --chart-5: #386150;
+  --sidebar: color-mix(in oklch, var(--background), black 8%);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: color-mix(in oklch, var(--sidebar), white 10%);
+  --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.55 0.14 300);
+  --sidebar-ring: var(--accent);
 
-  /* Text color used on top of a filled category color (mid-lightness swatches
-     read better with a near-black label than off-white). */
-  --cat-on-fill: oklch(0.16 0.01 289);
+  /* Text color used on top of a filled category color. Most of the new
+     category anchors are medium-to-dark, so light text is the right
+     default — except Cardio's Cool Sky, which is the one light anchor and
+     needs dark text for real contrast. categories.ts picks between these
+     per family via categoryOnFillVar(). */
+  --cat-on-fill-light: #eddbd4;
+  --cat-on-fill-dark: var(--background);
 
-  /* Level 1: base color family per workout category */
-  --cat-family-weightlifting: oklch(0.5 0.15 19);
-  --cat-family-cardio: oklch(0.58 0.12 205);
-  --cat-family-fun: oklch(0.6 0.13 300);
-  --cat-family-recovery: oklch(0.66 0.02 285);
+  /* Level 1: base color family per workout category (user-chosen anchors) */
+  --cat-family-weightlifting: #db6b43; /* Burnt Peach */
+  --cat-family-cardio: #70b1e2; /* Cool Sky */
+  --cat-family-fun: #386150; /* Hunter Green */
+  --cat-family-recovery: #ad685c; /* Terracotta Clay */
 
-  /* Level 2: Weightlifting (A) shades */
-  --cat-glutes-legs: oklch(0.58 0.17 19);
-  --cat-chest-triceps: oklch(0.5 0.15 8);
-  --cat-back-biceps: oklch(0.44 0.13 32);
-  --cat-abs: oklch(0.62 0.1 15);
+  /* Level 2: Weightlifting (A) shades — derived from Burnt Peach */
+  --cat-glutes-legs: var(--cat-family-weightlifting);
+  --cat-chest-triceps: color-mix(in oklch, var(--cat-family-weightlifting) 82%, black 18%);
+  --cat-back-biceps: color-mix(in oklch, var(--cat-family-weightlifting) 66%, black 34%);
+  --cat-abs: color-mix(in oklch, var(--cat-family-weightlifting) 68%, white 32%);
 
-  /* Level 2: Cardio (B) shades */
-  --cat-running: oklch(0.62 0.13 205);
-  --cat-incline-walking: oklch(0.56 0.12 215);
-  --cat-stairs: oklch(0.5 0.11 195);
-  --cat-swimming: oklch(0.58 0.135 225);
-  --cat-cycling: oklch(0.66 0.11 198);
+  /* Level 2: Cardio (B) shades — derived from Cool Sky */
+  --cat-running: var(--cat-family-cardio);
+  --cat-incline-walking: color-mix(in oklch, var(--cat-family-cardio) 84%, black 16%);
+  --cat-stairs: color-mix(in oklch, var(--cat-family-cardio) 68%, black 32%);
+  --cat-swimming: color-mix(in oklch, var(--cat-family-cardio) 84%, white 16%);
+  --cat-cycling: color-mix(in oklch, var(--cat-family-cardio) 68%, white 32%);
 
-  /* Level 2: Fun / Lifestyle (C) shades */
-  --cat-yoga: oklch(0.63 0.13 305);
-  --cat-pilates: oklch(0.56 0.145 293);
-  --cat-pickleball: oklch(0.69 0.12 318);
-  --cat-hiking: oklch(0.6 0.1 282);
+  /* Level 2: Fun / Lifestyle (C) shades — derived from Hunter Green */
+  --cat-yoga: var(--cat-family-fun);
+  --cat-pilates: color-mix(in oklch, var(--cat-family-fun) 82%, white 18%);
+  --cat-pickleball: color-mix(in oklch, var(--cat-family-fun) 65%, white 35%);
+  --cat-hiking: color-mix(in oklch, var(--cat-family-fun) 78%, black 22%);
 
-  /* Level 2: Recovery / Maintenance (D) shades */
-  --cat-mobility: oklch(0.7 0.02 285);
-  --cat-stretching: oklch(0.64 0.02 285);
-  --cat-light-walk: oklch(0.75 0.015 285);
-  --cat-rehab: oklch(0.58 0.02 285);
+  /* Level 2: Recovery / Maintenance (D) shades — derived from Terracotta Clay */
+  --cat-mobility: var(--cat-family-recovery);
+  --cat-stretching: color-mix(in oklch, var(--cat-family-recovery) 82%, black 18%);
+  --cat-light-walk: color-mix(in oklch, var(--cat-family-recovery) 78%, white 22%);
+  --cat-rehab: color-mix(in oklch, var(--cat-family-recovery) 62%, black 38%);
 
-  /* Generic fallback shades for user-created "Other" workout types */
-  --cat-custom-weightlifting: oklch(0.5 0.1 19);
-  --cat-custom-cardio: oklch(0.56 0.09 205);
-  --cat-custom-fun: oklch(0.58 0.09 300);
-  --cat-custom-recovery: oklch(0.62 0.015 285);
+  /* Generic fallback shades for user-created "Other" workout types —
+     a desaturated version of the family anchor. */
+  --cat-custom-weightlifting: color-mix(in oklch, var(--cat-family-weightlifting) 60%, oklch(0.5 0 0) 40%);
+  --cat-custom-cardio: color-mix(in oklch, var(--cat-family-cardio) 60%, oklch(0.5 0 0) 40%);
+  --cat-custom-fun: color-mix(in oklch, var(--cat-family-fun) 60%, oklch(0.5 0 0) 40%);
+  --cat-custom-recovery: color-mix(in oklch, var(--cat-family-recovery) 60%, oklch(0.5 0 0) 40%);
 }
 
 @layer base {
@@ -171,5 +216,42 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer components {
+  /* The default "box"/tile surface: a light Powder Petal card with dark
+     text, popped off the dark background with a soft shadow — used instead
+     of a slightly-lighter-dark card. Locally re-scoping --foreground/
+     --muted-foreground/--border/--secondary means every existing
+     text-foreground / text-muted-foreground / border-border / hover:bg-secondary
+     usage *inside* a .tile automatically resolves to the right light-surface
+     color, with no per-element edits needed. */
+  .tile {
+    background-color: var(--card);
+    color: var(--card-foreground);
+    border-color: var(--card-border);
+    --foreground: var(--card-foreground);
+    --muted-foreground: var(--card-muted-foreground);
+    --border: var(--card-border);
+    --secondary: var(--card-hover);
+    --secondary-foreground: var(--card-foreground);
+    box-shadow:
+      0 10px 24px -8px rgb(0 0 0 / 0.45),
+      0 3px 8px -3px rgb(0 0 0 / 0.3);
+  }
+
+  /* The inverse: the normal dark surface, used deliberately as a "done"
+     signal (e.g. a completed weekly-goal row) against the default-light
+     .tile surroundings. Uses --done-bg/--done-foreground (fixed) rather
+     than --secondary/--foreground, since a .tile-dark nested inside a
+     .tile would otherwise inherit that .tile's locally re-scoped values. */
+  .tile-dark {
+    background-color: var(--done-bg);
+    color: var(--done-foreground);
+    border-color: oklch(1 0 0 / 10%);
+    --foreground: var(--done-foreground);
+    --muted-foreground: color-mix(in oklch, var(--done-foreground) 65%, var(--done-bg) 35%);
+    --border: oklch(1 0 0 / 10%);
   }
 }

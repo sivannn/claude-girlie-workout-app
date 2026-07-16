@@ -34,7 +34,7 @@ export default async function GoalsPage() {
             <AccordionItem
               key={cat.category}
               value={cat.category}
-              className="rounded-xl border border-border px-4"
+              className="tile rounded-xl border px-4"
             >
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex w-full flex-col gap-2 pr-2 text-left">
@@ -86,7 +86,7 @@ export default async function GoalsPage() {
               {data.hallOfFame.map((g) => (
                 <div
                   key={g.id}
-                  className="flex items-center justify-between rounded-xl border border-border p-3"
+                  className="tile flex items-center justify-between rounded-xl border p-3"
                 >
                   <span className="text-sm font-medium text-foreground">
                     {g.title} — {g.targetValue} {g.unit}

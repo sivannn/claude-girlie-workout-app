@@ -17,7 +17,8 @@ import type {
 } from "@/lib/engine/types";
 import { movementCategoryLabel } from "@/lib/data/movement-labels";
 import { weeklyGoalBucketForWorkoutType } from "@/lib/data/workout-types";
-import type { ExperienceLevel, MovementCategory, WorkoutCategory } from "@/lib/types/enums";
+import { filterExercisesByEquipment } from "@/lib/data/equipment";
+import type { EquipmentAccess, ExperienceLevel, MovementCategory, WorkoutCategory } from "@/lib/types/enums";
 import { generateWorkoutBrief, generateWorkoutRecap } from "@/lib/ai/alex";
 import type {
   CompleteWorkoutPayload,
@@ -174,7 +175,7 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
     return { mode: "simple", ...base };
   }
 
-  const [liftingExercises, abExercises, preferences, recentPicks] = await Promise.all([
+  const [liftingExercisesRaw, abExercisesRaw, preferences, recentPicks] = await Promise.all([
     prisma.exercise.findMany({ where: { userId: user.id, workoutCategory: trainingCategory } }),
     prisma.exercise.findMany({ where: { userId: user.id, workoutCategory: "abs" } }),
     prisma.exercisePreference.findMany({ where: { userId: user.id } }),
@@ -182,6 +183,10 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
   ]);
   // Ab picks share the same recent workouts of this type.
   const recentAbPicks = recentPicks;
+
+  const equipmentAccess = user.preferences?.equipmentAccess as EquipmentAccess | null | undefined;
+  const liftingExercises = filterExercisesByEquipment(liftingExercisesRaw, equipmentAccess);
+  const abExercises = filterExercisesByEquipment(abExercisesRaw, equipmentAccess);
 
   const allExerciseIds = [...liftingExercises, ...abExercises].map((e) => e.id);
   const [histories, goals] = await Promise.all([

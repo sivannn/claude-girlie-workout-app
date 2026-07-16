@@ -75,11 +75,17 @@ export function WeekView({
 
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">Weekly Goals</h2>
-        <div className="divide-y divide-border rounded-xl border border-border">
+        <div className="flex flex-col gap-2">
           {(Object.keys(BUCKET_LABEL) as WeeklyGoalBucket[]).map((bucket) => {
             const status = weeklyStatus[bucket];
             return (
-              <div key={bucket} className="flex items-center justify-between px-4 py-3">
+              <div
+                key={bucket}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border px-4 py-3",
+                  status.completed ? "tile-dark" : "tile"
+                )}
+              >
                 <div className="flex items-center gap-2.5">
                   <span
                     className={cn(

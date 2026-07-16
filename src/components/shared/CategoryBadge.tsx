@@ -1,4 +1,4 @@
-import { categoryColorVar, categoryLabel } from "@/lib/design/categories";
+import { categoryColorVar, categoryLabel, categoryOnFillVar } from "@/lib/design/categories";
 import { cn } from "@/lib/utils";
 import type { EventStatus } from "@/lib/types/enums";
 
@@ -25,7 +25,7 @@ export function CategoryBadge({
       )}
       style={
         filled
-          ? { backgroundColor: color, color: "var(--cat-on-fill)" }
+          ? { backgroundColor: color, color: categoryOnFillVar(colorKey) }
           : {
               backgroundColor: "transparent",
               color,

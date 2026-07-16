@@ -24,7 +24,7 @@ export function ExerciseCard({
   onMove: (direction: "up" | "down") => void;
 }) {
   return (
-    <div className="rounded-xl border border-border p-4">
+    <div className="tile rounded-xl border p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

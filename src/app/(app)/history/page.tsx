@@ -26,7 +26,7 @@ export default async function HistoryPage({
         subtitle="Your training journal — what you did, and how you've improved."
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-4 rounded-xl border border-border p-4 sm:grid-cols-4">
+      <div className="tile mb-6 grid grid-cols-2 gap-4 rounded-xl border p-4 sm:grid-cols-4">
         <StatDisplay value={String(data.insights.totalWorkouts)} label="Total Workouts" size="sm" />
         <StatDisplay
           value={data.insights.mostImprovedExercise ? data.insights.mostImprovedExercise.name : "—"}

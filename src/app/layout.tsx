@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Coach Alex",
-  description: "Your AI personal trainer — built to help you enjoy working out and stay consistent long-term.",
+  title: "Bloom",
+  description: "Your AI personal trainer, Alex — built to help you enjoy working out and stay consistent long-term.",
 };
 
 export default function RootLayout({

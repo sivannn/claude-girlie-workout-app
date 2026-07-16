@@ -15,7 +15,7 @@ export function MonthlySummaryChart({ summary }: { summary: MonthlySummary }) {
   }).filter((d) => d.count > 0);
 
   return (
-    <div className="space-y-4 rounded-xl border border-border p-4">
+    <div className="tile space-y-4 rounded-xl border p-4">
       <div className="grid grid-cols-3 gap-4">
         <StatDisplay value={String(summary.totalCompleted)} label="Total" size="sm" />
         <StatDisplay value={String(summary.averagePerWeek)} label="Avg / Week" size="sm" />
