@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Bloom — AI Fitness Coach",
-    short_name: "Bloom",
+    name: "Steam — AI Fitness Coach",
+    short_name: "Steam",
     description: "Your AI personal trainer, Alex — built to help you enjoy working out and stay consistent long-term.",
     start_url: "/",
     display: "standalone",

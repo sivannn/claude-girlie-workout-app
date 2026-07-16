@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Bloom",
+  title: "Steam",
   description: "Your AI personal trainer, Alex — built to help you enjoy working out and stay consistent long-term.",
 };
 

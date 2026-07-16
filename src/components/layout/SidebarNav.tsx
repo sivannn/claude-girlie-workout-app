@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -11,11 +12,11 @@ export function SidebarNav() {
   return (
     <aside className="hidden md:flex md:w-60 md:flex-col md:border-r md:border-border md:bg-sidebar md:px-4 md:py-6">
       <Link href="/" className="mb-8 flex items-center gap-2 px-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-alex text-sm font-semibold text-alex-foreground">
-          A
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-alex-foreground p-1.5">
+          <Image src="/steam-logo.png" alt="" width={20} height={20} className="h-full w-full object-contain" />
         </span>
         <span className="text-lg font-semibold tracking-tight text-sidebar-foreground">
-          Bloom
+          Steam
         </span>
       </Link>
 

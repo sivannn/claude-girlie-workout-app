@@ -1,4 +1,4 @@
-# Bloom (placeholder name) — Claude Girlie Workout App
+# Steam — Claude Girlie Workout App
 
 A premium AI fitness coach: an "Alex" persona that recommends workouts using deterministic,
 evidence-based progression logic, then phrases the coaching copy in natural language.
