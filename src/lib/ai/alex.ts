@@ -252,3 +252,24 @@ Suggested next goal: ${facts.suggestedNext} ${facts.unit}
 Return only the message, no preamble.`;
   return askAlex(prompt, fallback);
 }
+
+// ---------------------------------------------------------------------------
+// Exercise instructions — "how to perform" text, cached on the Exercise row
+// ---------------------------------------------------------------------------
+
+export type ExerciseInfoFacts = {
+  name: string;
+  movementCategoryLabel: string;
+  equipment: string | null;
+};
+
+const GENERIC_FORM_FALLBACK =
+  "Focus on controlled form and a full range of motion. Warm up with a lighter weight first, brace your core, and stop a rep or two before your form breaks down. Ask a trainer if you're unsure about setup.";
+
+export async function generateExerciseInstructions(facts: ExerciseInfoFacts): Promise<string> {
+  const prompt = `Write brief step-by-step instructions (3-5 short steps) for how to correctly perform the exercise "${facts.name}"${
+    facts.equipment ? ` using ${facts.equipment}` : ""
+  } (a ${facts.movementCategoryLabel} movement). Include one key form cue and one common mistake to avoid. Keep it practical and easy to scan — no preamble, no sign-off, just the instructions.
+Format as plain text only: number each step like "1. ", one per line, with a blank line between steps. Do not use Markdown — no #, *, or ** characters anywhere.`;
+  return askAlex(prompt, GENERIC_FORM_FALLBACK);
+}

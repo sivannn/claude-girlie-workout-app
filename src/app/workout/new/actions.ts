@@ -7,6 +7,7 @@ import {
   decideProgression,
   estimateStartingWeight,
   generateWeightliftingWorkout,
+  rampWorkingSetWeights,
   trainingCategoryForWorkoutType,
 } from "@/lib/engine";
 import type {
@@ -19,13 +20,14 @@ import { movementCategoryLabel } from "@/lib/data/movement-labels";
 import { weeklyGoalBucketForWorkoutType } from "@/lib/data/workout-types";
 import { filterExercisesByEquipment } from "@/lib/data/equipment";
 import type { EquipmentAccess, ExperienceLevel, MovementCategory, WorkoutCategory } from "@/lib/types/enums";
-import { generateWorkoutBrief, generateWorkoutRecap } from "@/lib/ai/alex";
+import { generateExerciseInstructions, generateWorkoutBrief, generateWorkoutRecap } from "@/lib/ai/alex";
 import type {
   CompleteWorkoutPayload,
   GeneratedExerciseView,
   GeneratedSessionData,
   WorkoutRecapResult,
 } from "./types";
+import type { DraftWeightliftingPayload } from "./sessionState";
 
 const RECENT_SESSIONS_LIMIT = 5;
 
@@ -273,6 +275,23 @@ export async function getExerciseOptions(
   }));
 }
 
+/** Returns cached "how to perform" text for an exercise, generating + caching it on first request. */
+export async function getExerciseInstructions(exerciseId: string): Promise<string> {
+  const user = await getCurrentUser();
+  const exercise = await prisma.exercise.findFirstOrThrow({
+    where: { id: exerciseId, userId: user.id },
+  });
+  if (exercise.instructions) return exercise.instructions;
+
+  const text = await generateExerciseInstructions({
+    name: exercise.name,
+    movementCategoryLabel: movementCategoryLabel(exercise.movementCategory as MovementCategory),
+    equipment: exercise.equipment,
+  });
+  await prisma.exercise.update({ where: { id: exercise.id }, data: { instructions: text } });
+  return text;
+}
+
 /** Generates a progression preview for an exercise added manually mid-flow. */
 export async function previewExerciseProgression(exerciseId: string): Promise<GeneratedExerciseView> {
   const user = await getCurrentUser();
@@ -293,6 +312,7 @@ export async function previewExerciseProgression(exerciseId: string): Promise<Ge
         user.preferences?.bodyWeightLb
       );
   const decision = decideProgression(exercise as EngineExercise, history, new Date(), startingWeightHint);
+  const rampedWeights = rampWorkingSetWeights(decision.recommendedWeight, exercise.defaultIncrementLb, 3);
 
   return {
     exerciseId: exercise.id,
@@ -306,9 +326,9 @@ export async function previewExerciseProgression(exerciseId: string): Promise<Ge
     lastWorkoutSummary: formatSessionSummary(history[0]),
     longTermGoal: goals.get(exerciseId) ?? null,
     warmup: { weight: decision.warmupWeight, reps: decision.warmupReps },
-    workingSets: [1, 2, 3].map((setNumber) => ({
+    workingSets: [1, 2, 3].map((setNumber, i) => ({
       setNumber,
-      recommendedWeight: decision.recommendedWeight,
+      recommendedWeight: rampedWeights[i],
       recommendedRepsLow: decision.recommendedRepsLow,
       recommendedRepsHigh: decision.recommendedRepsHigh,
     })),
@@ -340,6 +360,58 @@ export async function createCustomWorkoutType(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Save & exit — resumable in-progress drafts (weightlifting only)
+// ---------------------------------------------------------------------------
+
+/** Creates or updates an IN_PROGRESS draft WorkoutEvent holding the full editable session state. */
+export async function saveDraftWorkout(
+  payload: DraftWeightliftingPayload,
+  draftEventId: string | null
+): Promise<{ draftEventId: string }> {
+  const user = await getCurrentUser();
+  const draftDataJson = JSON.stringify(payload);
+
+  if (draftEventId) {
+    await prisma.workoutEvent.findFirstOrThrow({ where: { id: draftEventId, userId: user.id } });
+    await prisma.workoutEvent.update({
+      where: { id: draftEventId },
+      data: { workoutTypeId: payload.workoutTypeId, draftDataJson, status: "IN_PROGRESS" },
+    });
+    return { draftEventId };
+  }
+
+  const created = await prisma.workoutEvent.create({
+    data: {
+      userId: user.id,
+      workoutTypeId: payload.workoutTypeId,
+      scheduledDate: new Date(),
+      status: "IN_PROGRESS",
+      createdBy: "USER",
+      draftDataJson,
+    },
+  });
+  return { draftEventId: created.id };
+}
+
+/** Reads back a draft's full session state for resuming the Start Workout flow. */
+export async function loadDraftWorkout(
+  draftEventId: string
+): Promise<{ draftEventId: string; draft: DraftWeightliftingPayload } | null> {
+  const user = await getCurrentUser();
+  const event = await prisma.workoutEvent.findFirst({
+    where: { id: draftEventId, userId: user.id, status: "IN_PROGRESS" },
+  });
+  if (!event?.draftDataJson) return null;
+  return { draftEventId: event.id, draft: JSON.parse(event.draftDataJson) as DraftWeightliftingPayload };
+}
+
+/** Discards a draft — used when exiting a workout with nothing meaningful entered. */
+export async function discardDraftWorkout(draftEventId: string): Promise<void> {
+  const user = await getCurrentUser();
+  await prisma.workoutEvent.deleteMany({ where: { id: draftEventId, userId: user.id } });
+}
+
+// ---------------------------------------------------------------------------
 // Workout completion
 // ---------------------------------------------------------------------------
 
@@ -361,7 +433,22 @@ export async function completeWorkout(
   return completeSimpleWorkout(user.id, workoutType.id, workoutType.name, payload, now);
 }
 
-async function createCompletedEvent(userId: string, workoutTypeId: string, workoutId: string, date: Date) {
+async function createCompletedEvent(
+  userId: string,
+  workoutTypeId: string,
+  workoutId: string,
+  date: Date,
+  draftEventId?: string | null
+) {
+  if (draftEventId) {
+    // Convert the in-progress draft event into the completed one, rather than
+    // leaving a stale IN_PROGRESS row behind alongside a new COMPLETED one.
+    await prisma.workoutEvent.update({
+      where: { id: draftEventId, userId },
+      data: { workoutTypeId, workoutId, scheduledDate: date, status: "COMPLETED", draftDataJson: null },
+    });
+    return;
+  }
   await prisma.workoutEvent.create({
     data: {
       userId,
@@ -425,7 +512,7 @@ async function completeWeightliftingWorkout(
     },
   });
 
-  await createCompletedEvent(userId, workoutTypeId, workout.id, now);
+  await createCompletedEvent(userId, workoutTypeId, workout.id, now, payload.draftEventId);
 
   // Learning signal: bump selection counts for exercises actually kept in this workout.
   await Promise.all(

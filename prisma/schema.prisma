@@ -110,6 +110,7 @@ model Exercise {
   defaultIncrementLb  Float?
   equipment           String? // "barbell" | "dumbbell" | "cable" | "machine" | "bodyweight" | "bands" - filters recommendations by the user's equipmentAccess
   isCustom            Boolean  @default(false)
+  instructions        String? // AI-generated "how to perform" text, cached on first request
   createdAt           DateTime @default(now())
 
   workoutExercises WorkoutExercise[]
@@ -188,6 +189,11 @@ model WorkoutEvent {
   createdBy     String      @default("AI")
   workoutId     String?     @unique
   workout       Workout?    @relation(fields: [workoutId], references: [id])
+  // JSON-serialized in-progress session state (exercises/sets) for status =
+  // IN_PROGRESS "save & exit" drafts. Cleared once the workout completes —
+  // never turned into a real Workout row until Finish, so drafts can't leak
+  // into weekly-goal/streak/PR queries that read Workout unconditionally.
+  draftDataJson String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

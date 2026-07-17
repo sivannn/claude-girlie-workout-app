@@ -4,7 +4,7 @@ import {
   selectExercisesForWorkout,
   type RecentSlotPick,
 } from "./exerciseSelection";
-import { decideProgression } from "./progression";
+import { decideProgression, rampWorkingSetWeights } from "./progression";
 import type { EngineExercise, EngineExercisePreference, EngineExerciseSession } from "./types";
 
 const DEFAULT_WORKING_SET_COUNT = 3;
@@ -36,9 +36,14 @@ function buildExercise(
 ): GeneratedWorkoutExercise {
   const decision = decideProgression(selection.exercise, history, asOfDate, startingWeightHint);
 
+  const rampedWeights = rampWorkingSetWeights(
+    decision.recommendedWeight,
+    selection.exercise.defaultIncrementLb,
+    workingSetCount
+  );
   const workingSets = Array.from({ length: workingSetCount }, (_, i) => ({
     setNumber: i + 1,
-    weight: decision.recommendedWeight,
+    weight: rampedWeights[i],
     repsLow: decision.recommendedRepsLow,
     repsHigh: decision.recommendedRepsHigh,
   }));

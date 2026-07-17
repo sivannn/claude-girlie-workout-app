@@ -3,13 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { WorkoutCategory } from "@/lib/types/enums";
-import { WorkoutTypeSelector, type WorkoutTypeOption } from "./WorkoutTypeSelector";
+import { WorkoutTypeSelector, type WorkoutTypeOption, type PickerGroup } from "./WorkoutTypeSelector";
+import { WorkoutCategoryPicker } from "./WorkoutCategoryPicker";
 import { WeightliftingSession } from "./WeightliftingSession";
 import { CardioSessionForm, type CardioResult } from "./CardioSessionForm";
 import { SimpleSessionForm } from "./SimpleSessionForm";
 import { RecapScreen } from "./RecapScreen";
-import { completeWorkout, createCustomWorkoutType, generateWorkoutForType } from "./actions";
-import type { EditableExercise } from "./sessionState";
+import {
+  completeWorkout,
+  createCustomWorkoutType,
+  generateWorkoutForType,
+  loadDraftWorkout,
+} from "./actions";
+import type { DraftWeightliftingPayload, EditableExercise } from "./sessionState";
 import type { GeneratedSessionData } from "./types";
 
 type Phase = "select" | "loading" | "session" | "finishing" | "recap";
@@ -17,13 +23,20 @@ type Phase = "select" | "loading" | "session" | "finishing" | "recap";
 export function StartWorkoutFlow({
   workoutTypes,
   initialTypeId,
+  initialResumeId,
+  initialCategory,
 }: {
   workoutTypes: WorkoutTypeOption[];
   initialTypeId: string | null;
+  initialResumeId: string | null;
+  initialCategory: PickerGroup | null;
 }) {
-  const [phase, setPhase] = useState<Phase>(initialTypeId ? "loading" : "select");
+  const [phase, setPhase] = useState<Phase>(initialTypeId || initialResumeId ? "loading" : "select");
   const [session, setSession] = useState<GeneratedSessionData | null>(null);
   const [recap, setRecap] = useState<{ text: string; prs: string[] } | null>(null);
+  const [draftEventId, setDraftEventId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<DraftWeightliftingPayload | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<PickerGroup | null>(initialCategory);
   const startedAt = useRef<number>(0);
   const initialized = useRef(false);
 
@@ -34,6 +47,35 @@ export function StartWorkoutFlow({
     setSession(data);
     setPhase("session");
   }, []);
+
+  const resumeDraft = useCallback(async (eventId: string) => {
+    setPhase("loading");
+    startedAt.current = Date.now();
+    const result = await loadDraftWorkout(eventId);
+    if (!result) {
+      setPhase("select");
+      return;
+    }
+    setSession({
+      mode: "weightlifting",
+      workoutTypeId: result.draft.workoutTypeId,
+      workoutTypeName: result.draft.workoutTypeName,
+      colorKey: result.draft.colorKey,
+      brief: result.draft.brief,
+      exercises: [],
+      abExercise: null,
+    });
+    setDraft(result.draft);
+    setDraftEventId(result.draftEventId);
+    setPhase("session");
+  }, []);
+
+  useEffect(() => {
+    if (initialResumeId && !initialized.current) {
+      initialized.current = true;
+      void resumeDraft(initialResumeId);
+    }
+  }, [initialResumeId, resumeDraft]);
 
   useEffect(() => {
     if (initialTypeId && !initialized.current) {
@@ -60,6 +102,7 @@ export function StartWorkoutFlow({
       workoutTypeId: session.workoutTypeId,
       durationMinutes: elapsedMinutes(),
       removedExerciseIds,
+      draftEventId,
       exercises: exercises.map((e) => ({
         exerciseId: e.exerciseId,
         movementCategory: e.movementCategory,
@@ -100,10 +143,15 @@ export function StartWorkoutFlow({
   };
 
   if (phase === "select") {
+    if (!selectedGroup) {
+      return <WorkoutCategoryPicker workoutTypes={workoutTypes} onSelectGroup={setSelectedGroup} />;
+    }
     return (
       <WorkoutTypeSelector
         workoutTypes={workoutTypes}
+        group={selectedGroup}
         onSelect={selectType}
+        onBack={() => setSelectedGroup(null)}
         onCreateCustom={handleCreateCustom}
       />
     );
@@ -136,7 +184,15 @@ export function StartWorkoutFlow({
 
   if (session.mode === "weightlifting") {
     return (
-      <WeightliftingSession session={session} onFinish={handleFinishWeightlifting} finishing={finishing} />
+      <WeightliftingSession
+        session={session}
+        initialExercises={draft?.exercises}
+        initialAbExercise={draft?.abExercise}
+        initialRemovedIds={draft?.removedExerciseIds}
+        draftEventId={draftEventId}
+        onFinish={handleFinishWeightlifting}
+        finishing={finishing}
+      />
     );
   }
   if (session.mode === "cardio") {

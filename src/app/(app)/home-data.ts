@@ -10,7 +10,7 @@ import {
 } from "@/lib/engine";
 import type { EngineWorkoutSummary, EngineWorkoutType } from "@/lib/engine/types";
 import { generateHomeInsight, generateRecommendationReason } from "@/lib/ai/alex";
-import { weeklyGoalBucketForWorkoutType } from "@/lib/data/workout-types";
+import { weeklyGoalBucketForWorkoutType, type WeeklyGoalBucket } from "@/lib/data/workout-types";
 import type { WorkoutCategory } from "@/lib/types/enums";
 
 async function getRecentWorkoutSummaries(userId: string): Promise<EngineWorkoutSummary[]> {
@@ -85,7 +85,7 @@ export async function getHomeData() {
   const monthlyTarget = preferences?.monthlyWorkoutTarget ?? 18;
   const now = new Date();
 
-  const [workoutTypes, recentWorkouts, recentAchievements, exerciseProgress] = await Promise.all([
+  const [workoutTypes, recentWorkouts, recentAchievements, exerciseProgress, draftEvent] = await Promise.all([
     prisma.workoutType.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }),
     getRecentWorkoutSummaries(user.id),
     prisma.achievement.findMany({
@@ -94,7 +94,15 @@ export async function getHomeData() {
       take: 3,
     }),
     getExerciseProgress(user.id),
+    prisma.workoutEvent.findFirst({
+      where: { userId: user.id, status: "IN_PROGRESS" },
+      include: { workoutType: true },
+      orderBy: { updatedAt: "desc" },
+    }),
   ]);
+  const draftWorkout = draftEvent
+    ? { id: draftEvent.id, workoutTypeName: draftEvent.workoutType.name, colorKey: draftEvent.workoutType.colorKey }
+    : null;
 
   const recommendation = recommendNextWorkout(
     workoutTypes as EngineWorkoutType[],
@@ -111,6 +119,19 @@ export async function getHomeData() {
         recommendation.workoutType.colorKey
       )
     : null;
+
+  // Weekly Goals "Start" links: leg_day maps to exactly one workout type, so
+  // it can skip both picker steps; the other buckets span multiple types, so
+  // they jump straight to step 2 (category already known).
+  const legDayType = workoutTypes.find(
+    (t) => weeklyGoalBucketForWorkoutType(t.category as WorkoutCategory, t.colorKey) === "leg_day"
+  );
+  const bucketStartHref: Record<WeeklyGoalBucket, string> = {
+    leg_day: legDayType ? `/workout/new?type=${legDayType.id}` : "/workout/new?category=WEIGHTLIFTING",
+    upper_body: "/workout/new?category=WEIGHTLIFTING",
+    cardio: "/workout/new?category=CARDIO",
+    fun: "/workout/new?category=FUN_ALL",
+  };
 
   const weeklyStatus = getWeeklyGoalStatus(recentWorkouts, weeklyTargets, now);
   const monthlyStatus = getMonthlyGoalStatus(recentWorkouts, monthlyTarget, now);
@@ -135,5 +156,7 @@ export async function getHomeData() {
     recentAchievements,
     insightText,
     hasAnyWorkouts: recentWorkouts.length > 0,
+    draftWorkout,
+    bucketStartHref,
   };
 }

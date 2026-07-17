@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,7 @@ export function CardioSessionForm({
   const [minutes, setMinutes] = useState("");
   const [seconds, setSeconds] = useState("");
   const [distance, setDistance] = useState("");
+  const router = useRouter();
 
   const submit = () => {
     const totalSeconds =
@@ -101,9 +103,14 @@ export function CardioSessionForm({
         />
       </div>
 
-      <Button size="lg" disabled={finishing} onClick={submit}>
-        {finishing ? "Saving…" : "Finish Workout"}
-      </Button>
+      <div className="flex gap-2">
+        <Button variant="outline" className="flex-1" disabled={finishing} onClick={() => router.push("/")}>
+          Exit
+        </Button>
+        <Button size="lg" className="flex-[2]" disabled={finishing} onClick={submit}>
+          {finishing ? "Saving…" : "Finish Workout"}
+        </Button>
+      </div>
     </div>
   );
 }

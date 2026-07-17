@@ -30,3 +30,14 @@ export function parseNumberInput(value: string): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
+
+/** Full in-progress weightlifting session state, JSON-serialized into a "save & exit" draft. */
+export type DraftWeightliftingPayload = {
+  workoutTypeId: string;
+  workoutTypeName: string;
+  colorKey: string;
+  brief: string;
+  exercises: EditableExercise[];
+  abExercise: EditableExercise | null;
+  removedExerciseIds: string[];
+};

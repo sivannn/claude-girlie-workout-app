@@ -17,9 +17,25 @@ const DEFAULT_INCREMENT_LB = 5;
 const DELOAD_STALL_THRESHOLD = 3; // consecutive non-progressing sessions
 const RETURN_FROM_BREAK_DAYS = 21;
 
-function roundToIncrement(value: number, increment: number): number {
+export function roundToIncrement(value: number, increment: number): number {
   const step = increment >= 5 ? 5 : increment;
   return Math.round(value / step) * step;
+}
+
+// Straight sets at one flat weight don't match how people actually train —
+// ramp working sets up to the target instead of holding them all identical.
+const RAMP_FRACTIONS = [0.9, 0.95, 1.0];
+
+export function rampWorkingSetWeights(
+  target: number | null,
+  incrementLb: number | null | undefined,
+  count: number
+): Array<number | null> {
+  if (target == null) return Array(count).fill(null);
+  const increment = incrementLb ?? DEFAULT_INCREMENT_LB;
+  return Array.from({ length: count }, (_, i) =>
+    roundToIncrement(target * RAMP_FRACTIONS[Math.min(i, RAMP_FRACTIONS.length - 1)], increment)
+  );
 }
 
 function daysBetween(a: Date, b: Date): number {

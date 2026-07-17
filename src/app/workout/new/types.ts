@@ -53,6 +53,8 @@ export type CompleteWeightliftingPayload = {
   durationMinutes: number;
   /** Exercises the coach recommended but the user removed before finishing — feeds the learning system. */
   removedExerciseIds: string[];
+  /** Set when finishing a resumed "save & exit" draft, so the draft event is converted rather than duplicated. */
+  draftEventId?: string | null;
   exercises: Array<{
     exerciseId: string;
     movementCategory: string;

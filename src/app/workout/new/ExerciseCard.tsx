@@ -1,9 +1,17 @@
 "use client";
 
-import { Trash2, ChevronUp, ChevronDown, Plus } from "lucide-react";
+import { useState } from "react";
+import { Trash2, ChevronUp, ChevronDown, Plus, X, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { getExerciseInstructions } from "./actions";
 import type { EditableExercise } from "./sessionState";
 
 export function ExerciseCard({
@@ -12,6 +20,7 @@ export function ExerciseCard({
   canMoveDown,
   onSetChange,
   onAddSet,
+  onRemoveSet,
   onRemove,
   onMove,
 }: {
@@ -20,15 +29,38 @@ export function ExerciseCard({
   canMoveDown: boolean;
   onSetChange: (setIndex: number, field: "actualWeight" | "actualReps", value: string) => void;
   onAddSet: () => void;
+  onRemoveSet: (setIndex: number) => void;
   onRemove: () => void;
   onMove: (direction: "up" | "down") => void;
 }) {
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoText, setInfoText] = useState<string | null>(null);
+  const [infoLoading, setInfoLoading] = useState(false);
+
+  const openInfo = async () => {
+    setInfoOpen(true);
+    if (infoText) return;
+    setInfoLoading(true);
+    const text = await getExerciseInstructions(exercise.exerciseId);
+    setInfoText(text);
+    setInfoLoading(false);
+  };
+
   return (
     <div className="tile rounded-xl border p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold text-foreground">{exercise.name}</h3>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 text-muted-foreground"
+              onClick={openInfo}
+              aria-label={`How to perform ${exercise.name}`}
+            >
+              <Info className="h-3.5 w-3.5" />
+            </Button>
             <Badge variant="secondary" className="text-[11px] font-normal">
               {exercise.movementCategoryLabel}
             </Badge>
@@ -91,14 +123,15 @@ export function ExerciseCard({
       )}
 
       <div className="mt-3 space-y-2">
-        <div className="grid grid-cols-[2rem_1fr_1fr_1fr] gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="grid grid-cols-[2rem_1fr_1fr_1fr_1.75rem] gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Set</span>
           <span>Recommended</span>
           <span>Weight</span>
           <span>Reps</span>
+          <span />
         </div>
         {exercise.sets.map((set, i) => (
-          <div key={set.setNumber} className="grid grid-cols-[2rem_1fr_1fr_1fr] items-center gap-2">
+          <div key={set.setNumber} className="grid grid-cols-[2rem_1fr_1fr_1fr_1.75rem] items-center gap-2">
             <span className="text-sm text-muted-foreground">{set.setNumber}</span>
             <span className="text-sm text-muted-foreground">
               {set.recommendedWeight != null ? `${set.recommendedWeight} lb` : "—"} ×{" "}
@@ -120,6 +153,16 @@ export function ExerciseCard({
               onChange={(e) => onSetChange(i, "actualReps", e.target.value)}
               className="h-9"
             />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive disabled:opacity-0"
+              disabled={exercise.sets.length <= 1}
+              onClick={() => onRemoveSet(i)}
+              aria-label="Remove set"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
           </div>
         ))}
       </div>
@@ -127,6 +170,19 @@ export function ExerciseCard({
       <Button variant="ghost" size="sm" className="mt-2 gap-1 text-xs" onClick={onAddSet}>
         <Plus className="h-3.5 w-3.5" /> Add set
       </Button>
+
+      <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>How to: {exercise.name}</DialogTitle>
+          </DialogHeader>
+          {infoLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : (
+            <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">{infoText}</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

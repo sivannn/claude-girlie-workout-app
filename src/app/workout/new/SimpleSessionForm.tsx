@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +18,7 @@ export function SimpleSessionForm({
   finishing: boolean;
 }) {
   const [notes, setNotes] = useState("");
+  const router = useRouter();
 
   return (
     <div className="flex flex-col gap-5">
@@ -35,9 +37,19 @@ export function SimpleSessionForm({
         />
       </div>
 
-      <Button size="lg" disabled={finishing} onClick={() => onFinish({ notes: notes.trim() || null })}>
-        {finishing ? "Saving…" : "Finish Workout"}
-      </Button>
+      <div className="flex gap-2">
+        <Button variant="outline" className="flex-1" disabled={finishing} onClick={() => router.push("/")}>
+          Exit
+        </Button>
+        <Button
+          size="lg"
+          className="flex-[2]"
+          disabled={finishing}
+          onClick={() => onFinish({ notes: notes.trim() || null })}
+        >
+          {finishing ? "Saving…" : "Finish Workout"}
+        </Button>
+      </div>
     </div>
   );
 }

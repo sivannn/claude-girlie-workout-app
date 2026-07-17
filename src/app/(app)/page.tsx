@@ -40,6 +40,14 @@ export default async function HomePage() {
 
   return (
     <div className="flex flex-col gap-8">
+      {data.draftWorkout ? (
+        <Button size="lg" variant="outline" className="w-full text-base" asChild>
+          <Link href={`/workout/new?resume=${data.draftWorkout.id}`}>
+            Resume {data.draftWorkout.workoutTypeName}
+          </Link>
+        </Button>
+      ) : null}
+
       <Button size="lg" className="w-full text-base" asChild>
         <Link
           href={data.recommendation ? `/workout/new?type=${data.recommendation.workoutType.id}` : "/workout/new"}
@@ -99,11 +107,18 @@ export default async function HomePage() {
                     </p>
                   </div>
                 </div>
-                {isRecommended ? (
-                  <span className="rounded-full bg-accent/15 px-2 py-1 text-[11px] font-medium text-accent">
-                    Recommended
-                  </span>
-                ) : null}
+                <div className="flex shrink-0 items-center gap-2">
+                  {isRecommended ? (
+                    <span className="rounded-full bg-accent/15 px-2 py-1 text-[11px] font-medium text-accent">
+                      Recommended
+                    </span>
+                  ) : null}
+                  {!status.completed ? (
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={data.bucketStartHref[bucket]}>Start</Link>
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             );
           })}

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav-items";
 
@@ -21,6 +22,13 @@ export function SidebarNav() {
       </Link>
 
       <nav className="flex flex-1 flex-col gap-1">
+        <Link
+          href="/workout/new"
+          className="mb-1 flex items-center gap-3 rounded-lg bg-destructive px-3 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90"
+        >
+          <Plus className="h-4.5 w-4.5" strokeWidth={2.5} />
+          Start Workout
+        </Link>
         {NAV_ITEMS.map((item) => {
           const isActive =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
