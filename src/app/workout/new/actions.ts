@@ -371,11 +371,20 @@ export async function saveDraftWorkout(
   const user = await getCurrentUser();
   const draftDataJson = JSON.stringify(payload);
 
+  // The workout type comes from the client payload — confirm it's the user's.
+  await prisma.workoutType.findFirstOrThrow({
+    where: { id: payload.workoutTypeId, userId: user.id },
+  });
+
   if (draftEventId) {
-    await prisma.workoutEvent.findFirstOrThrow({ where: { id: draftEventId, userId: user.id } });
+    // Constrained to IN_PROGRESS so a stale id can't overwrite a planned or
+    // completed calendar event with draft state.
+    await prisma.workoutEvent.findFirstOrThrow({
+      where: { id: draftEventId, userId: user.id, status: "IN_PROGRESS" },
+    });
     await prisma.workoutEvent.update({
       where: { id: draftEventId },
-      data: { workoutTypeId: payload.workoutTypeId, draftDataJson, status: "IN_PROGRESS" },
+      data: { workoutTypeId: payload.workoutTypeId, draftDataJson },
     });
     return { draftEventId };
   }
@@ -472,9 +481,14 @@ async function completeWeightliftingWorkout(
   const [priorBests, histories, exerciseRows, user] = await Promise.all([
     getPriorBestWeights(userId, exerciseIds),
     getExerciseHistories(userId, exerciseIds),
-    prisma.exercise.findMany({ where: { id: { in: exerciseIds } } }),
+    prisma.exercise.findMany({ where: { id: { in: exerciseIds }, userId } }),
     getCurrentUser(),
   ]);
+  // Every client-supplied exercise id must resolve to one of the user's own
+  // exercises — anything else is a forged or stale reference.
+  if (exerciseRows.length !== new Set(exerciseIds).size) {
+    throw new Error("Workout references exercises that don't belong to this account.");
+  }
   const exerciseNameById = new Map(exerciseRows.map((e) => [e.id, e.name]));
 
   const workout = await prisma.workout.create({
@@ -526,8 +540,17 @@ async function completeWeightliftingWorkout(
   );
 
   // Learning signal: exercises the coach recommended but the user removed.
+  // Client-supplied ids again — count only ones that are actually theirs.
+  const ownedRemovedIds = payload.removedExerciseIds.length
+    ? (
+        await prisma.exercise.findMany({
+          where: { id: { in: payload.removedExerciseIds }, userId },
+          select: { id: true },
+        })
+      ).map((e) => e.id)
+    : [];
   await Promise.all(
-    payload.removedExerciseIds.map((exerciseId) =>
+    ownedRemovedIds.map((exerciseId) =>
       prisma.exercisePreference.upsert({
         where: { userId_exerciseId: { userId, exerciseId } },
         update: { timesRemoved: { increment: 1 } },

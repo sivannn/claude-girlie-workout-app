@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/auth";
 import { getWorkoutTypes } from "./actions";
 import { StartWorkoutFlow } from "./StartWorkoutFlow";
 import type { PickerGroup } from "./WorkoutTypeSelector";
@@ -12,6 +13,8 @@ export default async function StartWorkoutPage({
 }: {
   searchParams: Promise<{ type?: string; resume?: string; category?: string }>;
 }) {
+  // This route sits outside the (app) group, so it needs its own session gate.
+  await getCurrentUser();
   const [{ type, resume, category }, workoutTypes] = await Promise.all([searchParams, getWorkoutTypes()]);
   const initialCategory = VALID_GROUPS.includes(category as PickerGroup) ? (category as PickerGroup) : null;
 
