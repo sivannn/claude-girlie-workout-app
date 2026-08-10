@@ -26,6 +26,20 @@ export default async function ProgressPage() {
       <div className="flex flex-col gap-8">
         {data.overviewInsight ? <AlexNote>{data.overviewInsight}</AlexNote> : null}
 
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-foreground">Your Journey</h2>
+          <div className="tile grid grid-cols-3 gap-4 rounded-xl border p-4">
+            <StatDisplay value={String(data.journey.totalWorkouts)} label="Total Workouts" size="sm" />
+            <StatDisplay
+              value={data.journey.mostImprovedExercise ? `+${data.journey.mostImprovedExercise.delta} lb` : "—"}
+              label="Most Improved"
+              sublabel={data.journey.mostImprovedExercise?.name}
+              size="sm"
+            />
+            <StatDisplay value={data.journey.mostFrequentType ?? "—"} label="Most Frequent" size="sm" />
+          </div>
+        </section>
+
         {data.activeGoals.length > 0 ? (
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-foreground">Goal Progress</h2>

@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import type { CalendarEvent } from "./data";
 import { RescheduleDialog } from "./RescheduleDialog";
+import { WorkoutDetailView } from "./WorkoutDetailView";
 
 const STATUS_LABEL: Record<string, string> = {
   PLANNED: "Planned",
@@ -39,6 +40,9 @@ export function DayEventsSheet({
                 <p className="mt-2 text-xs text-muted-foreground">{e.durationMinutes} min</p>
               ) : null}
               {e.summary ? <p className="mt-1 text-xs text-muted-foreground">{e.summary}</p> : null}
+              {e.status === "COMPLETED" && e.workoutId ? (
+                <WorkoutDetailView workoutId={e.workoutId} />
+              ) : null}
               {e.status === "MISSED" ? (
                 <div className="mt-3">
                   <RescheduleDialog eventId={e.id} workoutTypeName={e.workoutTypeName} />

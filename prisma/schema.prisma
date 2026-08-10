@@ -74,7 +74,7 @@ model UserPreferences {
   workoutPreferences String? // JSON-encoded string[] - workout types the user enjoys (weightlifting, yoga, running, etc.)
   equipmentAccess    String? // "commercial_gym" | "home_gym" | "apartment_gym" | "bodyweight_only" - filters exercise recommendations by required equipment
 
-  createdAt DateTime @updatedAt
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 

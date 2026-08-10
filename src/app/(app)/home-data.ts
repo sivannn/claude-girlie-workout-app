@@ -147,6 +147,7 @@ export async function getHomeData() {
   const insightText = insightFact ? await generateHomeInsight(insightFact) : null;
 
   return {
+    userName: user.name,
     recommendation,
     recommendationReason,
     recommendedBucket,

@@ -21,6 +21,8 @@ export type CalendarEvent = {
   date: Date;
   durationMinutes: number | null;
   summary: string | null;
+  /** Links a COMPLETED event to its journal entry for the detail view. */
+  workoutId: string | null;
 };
 
 function isSameDayUTC(a: Date, b: Date): boolean {
@@ -120,6 +122,7 @@ export async function getCalendarMonthData(monthDate: Date) {
     date: e.scheduledDate,
     durationMinutes: e.workout?.durationMinutes ?? null,
     summary: e.workout?.aiRecapText ?? null,
+    workoutId: e.workoutId,
   }));
 
   const recommendationReason = recommendation
@@ -158,6 +161,7 @@ export async function getCurrentWeekEvents(): Promise<CalendarEvent[]> {
     date: e.scheduledDate,
     durationMinutes: e.workout?.durationMinutes ?? null,
     summary: e.workout?.aiRecapText ?? null,
+    workoutId: e.workoutId,
   }));
 }
 
@@ -191,7 +195,7 @@ export async function getWeeklyGoalChecklist(weekDate: Date) {
 export type MonthlySummary = {
   totalCompleted: number;
   averagePerWeek: number;
-  completionRate: number; // percent of planned/missed events that were completed
+  completionRate: number | null; // percent of resolved events completed; null when none resolved yet
   categoryBreakdown: Array<{ category: string; count: number }>;
   typeDistribution: Array<{ name: string; count: number }>;
 };
@@ -217,10 +221,12 @@ export async function getMonthlySummary(monthDate: Date): Promise<MonthlySummary
 
   const completedEvents = events.filter((e) => e.status === "COMPLETED").length;
   const missedEvents = events.filter((e) => e.status === "MISSED").length;
+  // null = no resolved events this month; the chart renders a dash instead of
+  // the misleading "100%" an empty month used to show.
   const completionRate =
     completedEvents + missedEvents > 0
       ? Math.round((completedEvents / (completedEvents + missedEvents)) * 100)
-      : 100;
+      : null;
 
   const categoryCounts = new Map<string, number>();
   const typeCounts = new Map<string, number>();

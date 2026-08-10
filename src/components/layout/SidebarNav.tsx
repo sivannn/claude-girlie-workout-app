@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "./nav-items";
+import { NAV_ITEMS, isNavItemActive } from "./nav-items";
 
 export function SidebarNav() {
   const pathname = usePathname();
@@ -30,8 +30,7 @@ export function SidebarNav() {
           Start Workout
         </Link>
         {NAV_ITEMS.map((item) => {
-          const isActive =
-            item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const isActive = isNavItemActive(item, pathname);
           const Icon = item.icon;
           return (
             <Link
