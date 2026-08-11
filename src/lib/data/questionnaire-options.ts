@@ -1,6 +1,9 @@
 import type {
+  BlockFocusStyle,
+  DeloadPreference,
   EquipmentAccess,
   ExperienceLevel,
+  InjuryArea,
   PrimaryGoal,
   TrainingCategory,
   WorkoutPreference,
@@ -48,4 +51,61 @@ export const EQUIPMENT_OPTIONS: Array<{ value: EquipmentAccess; label: string; h
   { value: "home_gym", label: "Home gym", hint: "Barbell, rack, and dumbbells" },
   { value: "apartment_gym", label: "Apartment/building gym", hint: "A smaller selection of machines and dumbbells" },
   { value: "bodyweight_only", label: "Bodyweight only", hint: "No equipment, or just resistance bands" },
+];
+
+// --- Block Periodization questions -----------------------------------------
+
+export const TRAINING_DAYS_OPTIONS: Array<{ value: number; label: string; hint: string }> = [
+  { value: 2, label: "2 days", hint: "Full-body sessions — the most that fits a busy week" },
+  { value: 3, label: "3 days", hint: "Full-body, with a rest day between each" },
+  { value: 4, label: "4 days", hint: "Upper/lower split — a strong middle ground" },
+  { value: 5, label: "5 days", hint: "Push, pull, legs with room to repeat" },
+  { value: 6, label: "6 days", hint: "Push, pull, legs twice through" },
+];
+
+export const INJURY_OPTIONS: Array<{ value: InjuryArea; label: string; hint: string }> = [
+  { value: "knee", label: "Knees", hint: "Deep squatting and jumping get swapped out" },
+  { value: "shoulder", label: "Shoulders", hint: "Overhead pressing and wide grips get swapped out" },
+  { value: "lower_back", label: "Lower back", hint: "Loaded hinging and spinal compression get swapped out" },
+  { value: "wrist", label: "Wrists", hint: "Front-rack and heavy pressing grips get swapped out" },
+  { value: "hip", label: "Hips", hint: "Deep hip flexion and wide stances get swapped out" },
+];
+
+export const BLOCK_DURATION_OPTIONS: Array<{ value: number; label: string; hint: string }> = [
+  { value: 4, label: "4 weeks", hint: "Change focus often — good if you get bored quickly" },
+  { value: 6, label: "6 weeks", hint: "A balanced middle ground" },
+  { value: 8, label: "8 weeks", hint: "Longer runway to see real progress on each focus" },
+];
+
+export const BLOCK_COUNT_OPTIONS: Array<{ value: number; label: string; hint: string }> = [
+  { value: 2, label: "2 blocks", hint: "A short arc you can commit to" },
+  { value: 3, label: "3 blocks", hint: "A full progression, start to finish" },
+  { value: 4, label: "4 blocks", hint: "A long-term plan with plenty of variety" },
+];
+
+export const BLOCK_FOCUS_STYLE_OPTIONS: Array<{ value: BlockFocusStyle; label: string; hint: string }> = [
+  {
+    value: "balanced",
+    label: "Rotate through focuses",
+    hint: "Each block trains something different — muscle, then strength, then power",
+  },
+  {
+    value: "specialized",
+    label: "Stay focused on my goal",
+    hint: "Most blocks push hard at your main goal, with lighter variation between",
+  },
+];
+
+export const DELOAD_OPTIONS: Array<{ value: DeloadPreference; label: string; hint: string }> = [
+  {
+    value: "scheduled",
+    label: "Plan a lighter week",
+    hint: "The last week of each block eases off so you recover before the next push",
+  },
+  {
+    value: "when_needed",
+    label: "Only when I stall",
+    hint: "Keep going until progress stalls, then back off automatically",
+  },
+  { value: "minimal", label: "Rarely", hint: "I'd rather keep the intensity up" },
 ];

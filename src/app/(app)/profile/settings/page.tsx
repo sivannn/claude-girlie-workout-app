@@ -1,8 +1,11 @@
 import { PageHeader } from "@/components/shared/PageHeader";
 import { getCurrentUser } from "@/lib/auth";
 import type {
+  BlockFocusStyle,
+  DeloadPreference,
   EquipmentAccess,
   ExperienceLevel,
+  InjuryArea,
   PrimaryGoal,
   TrainingCategory,
   WorkoutPreference,
@@ -40,6 +43,13 @@ export default async function AccountSettingsPage() {
           experienceLevel: (prefs?.experienceLevel ?? "new") as ExperienceLevel,
           bodyWeightLb: prefs?.bodyWeightLb ?? null,
           monthlyWorkoutTarget: prefs?.monthlyWorkoutTarget ?? 18,
+          trainingDaysPerWeek: prefs?.trainingDaysPerWeek ?? 3,
+          injuryAreas: parseJsonList<InjuryArea>(prefs?.injuryAreas),
+          injuryNote: prefs?.injuryNote ?? null,
+          blockDurationWeeks: prefs?.blockDurationWeeks ?? 6,
+          blockCount: prefs?.blockCount ?? 3,
+          blockFocusStyle: (prefs?.blockFocusStyle ?? "balanced") as BlockFocusStyle,
+          deloadPreference: (prefs?.deloadPreference ?? "scheduled") as DeloadPreference,
         }}
       />
     </div>

@@ -11,17 +11,26 @@ import { AlexNote } from "@/components/shared/AlexNote";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { cn } from "@/lib/utils";
 import type {
+  BlockFocusStyle,
+  DeloadPreference,
   EquipmentAccess,
   ExperienceLevel,
+  InjuryArea,
   PrimaryGoal,
   TrainingCategory,
   WorkoutPreference,
 } from "@/lib/types/enums";
 import {
+  BLOCK_COUNT_OPTIONS,
+  BLOCK_DURATION_OPTIONS,
+  BLOCK_FOCUS_STYLE_OPTIONS,
+  DELOAD_OPTIONS,
   EQUIPMENT_OPTIONS,
   EXPERIENCE_OPTIONS,
+  INJURY_OPTIONS,
   MUSCLE_PRIORITY_OPTIONS,
   PRIMARY_GOAL_OPTIONS,
+  TRAINING_DAYS_OPTIONS,
   WORKOUT_PREFERENCE_OPTIONS,
 } from "@/lib/data/questionnaire-options";
 import { completeOnboarding, type FirstWorkoutPreview } from "./actions";
@@ -30,11 +39,15 @@ type Step =
   | "welcome"
   | "primary_goal"
   | "muscle_priorities"
+  | "training_days"
   | "workout_preferences"
   | "equipment"
   | "experience"
+  | "injuries"
   | "bodyweight"
   | "monthly"
+  | "block_structure"
+  | "block_style"
   | "plan";
 
 function toggleValue<T>(list: T[], value: T): T[] {
@@ -63,11 +76,19 @@ export function OnboardingWizard() {
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel | null>(null);
   const [bodyWeight, setBodyWeight] = useState("");
   const [monthlyTarget, setMonthlyTarget] = useState(18);
+  // Block Periodization answers.
+  const [trainingDaysPerWeek, setTrainingDaysPerWeek] = useState<number | null>(null);
+  const [injuryAreas, setInjuryAreas] = useState<InjuryArea[]>([]);
+  const [injuryNote, setInjuryNote] = useState("");
+  const [blockDurationWeeks, setBlockDurationWeeks] = useState(6);
+  const [blockCount, setBlockCount] = useState(3);
+  const [blockFocusStyle, setBlockFocusStyle] = useState<BlockFocusStyle>("balanced");
+  const [deloadPreference, setDeloadPreference] = useState<DeloadPreference>("scheduled");
   const [preview, setPreview] = useState<FirstWorkoutPreview | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const afterPrimaryGoalStep: Step = primaryGoal === "build_muscle" ? "muscle_priorities" : "workout_preferences";
-  const beforeWorkoutPreferencesStep: Step = primaryGoal === "build_muscle" ? "muscle_priorities" : "primary_goal";
+  const afterPrimaryGoalStep: Step = primaryGoal === "build_muscle" ? "muscle_priorities" : "training_days";
+  const beforeTrainingDaysStep: Step = primaryGoal === "build_muscle" ? "muscle_priorities" : "primary_goal";
 
   const submit = () => {
     setStep("plan");
@@ -80,6 +101,13 @@ export function OnboardingWizard() {
         musclePriorities,
         workoutPreferences,
         equipmentAccess: equipmentAccess ?? "bodyweight_only",
+        trainingDaysPerWeek: trainingDaysPerWeek ?? 3,
+        injuryAreas,
+        injuryNote: injuryNote.trim() || null,
+        blockDurationWeeks,
+        blockCount,
+        blockFocusStyle,
+        deloadPreference,
       });
       setPreview(result.preview);
     });
@@ -181,6 +209,50 @@ export function OnboardingWizard() {
             <Button
               className="flex-1"
               disabled={musclePriorities.length === 0}
+              onClick={() => setStep("training_days")}
+            >
+              Continue
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === "training_days" && (
+        <div className="flex flex-col gap-6">
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-semibold text-foreground">
+              How many days a week can you train?
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Be honest rather than optimistic — I&apos;ll build your split around the days you
+              actually have, and consistency beats ambition every time.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {TRAINING_DAYS_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setTrainingDaysPerWeek(option.value)}
+                className={cn(
+                  "rounded-xl border px-4 py-3 text-left transition-colors",
+                  trainingDaysPerWeek === option.value
+                    ? "border-accent bg-accent/10"
+                    : "tile hover:bg-secondary"
+                )}
+              >
+                <div className="font-medium text-foreground">{option.label}</div>
+                <div className="text-xs text-muted-foreground">{option.hint}</div>
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={() => setStep(beforeTrainingDaysStep)}>
+              Back
+            </Button>
+            <Button
+              className="flex-1"
+              disabled={trainingDaysPerWeek === null}
               onClick={() => setStep("workout_preferences")}
             >
               Continue
@@ -220,7 +292,7 @@ export function OnboardingWizard() {
             })}
           </div>
           <div className="flex gap-3">
-            <Button variant="ghost" onClick={() => setStep(beforeWorkoutPreferencesStep)}>
+            <Button variant="ghost" onClick={() => setStep("training_days")}>
               Back
             </Button>
             <Button
@@ -302,8 +374,67 @@ export function OnboardingWizard() {
             <Button variant="ghost" onClick={() => setStep("equipment")}>
               Back
             </Button>
-            <Button className="flex-1" disabled={!experienceLevel} onClick={() => setStep("bodyweight")}>
+            <Button className="flex-1" disabled={!experienceLevel} onClick={() => setStep("injuries")}>
               Continue
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === "injuries" && (
+        <div className="flex flex-col gap-6">
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-semibold text-foreground">
+              Anything I should train around?
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Pick anything that gives you trouble and I&apos;ll leave those movements out of your
+              plan, swapping in alternatives instead. Skip if nothing applies.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {INJURY_OPTIONS.map((option) => {
+              const checked = injuryAreas.includes(option.value);
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setInjuryAreas((prev) => toggleValue(prev, option.value))}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
+                    checked ? "border-accent bg-accent/10" : "tile hover:bg-secondary"
+                  )}
+                >
+                  <CheckboxIndicator checked={checked} />
+                  <span>
+                    <span className="block font-medium text-foreground">{option.label}</span>
+                    <span className="block text-xs text-muted-foreground">{option.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {injuryAreas.length > 0 ? (
+            <div className="space-y-1.5">
+              <Input
+                placeholder="Anything else I should know? (optional)"
+                value={injuryNote}
+                onChange={(e) => setInjuryNote(e.target.value)}
+                maxLength={280}
+                className="text-base"
+              />
+              <p className="text-xs text-muted-foreground">
+                I&apos;ll keep this in mind, but I&apos;m not a medical professional — check with one
+                if you&apos;re working through an injury.
+              </p>
+            </div>
+          ) : null}
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={() => setStep("experience")}>
+              Back
+            </Button>
+            <Button className="flex-1" onClick={() => setStep("bodyweight")}>
+              {injuryAreas.length > 0 ? "Continue" : "Nothing to note"}
             </Button>
           </div>
         </div>
@@ -330,7 +461,7 @@ export function OnboardingWizard() {
             <span className="text-sm text-muted-foreground">lb</span>
           </div>
           <div className="flex gap-3">
-            <Button variant="ghost" onClick={() => setStep("experience")}>
+            <Button variant="ghost" onClick={() => setStep("injuries")}>
               Back
             </Button>
             <Button variant="secondary" onClick={() => { setBodyWeight(""); setStep("monthly"); }}>
@@ -372,6 +503,149 @@ export function OnboardingWizard() {
           </div>
           <div className="flex gap-3">
             <Button variant="ghost" onClick={() => setStep("bodyweight")}>
+              Back
+            </Button>
+            <Button className="flex-1" onClick={() => setStep("block_structure")}>
+              Continue
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === "block_structure" && (
+        <div className="flex flex-col gap-6">
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-semibold text-foreground">
+              Let&apos;s shape your training blocks.
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              I build your plan in blocks — stretches of weeks that each train one quality hard
+              before moving on. It&apos;s how serious programs are written, and it&apos;s why
+              progress keeps coming instead of stalling.
+            </p>
+          </div>
+
+          <div className="space-y-2.5">
+            <h3 className="text-sm font-semibold text-foreground">How long should each block run?</h3>
+            <div className="flex flex-col gap-2">
+              {BLOCK_DURATION_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setBlockDurationWeeks(option.value)}
+                  className={cn(
+                    "rounded-xl border px-4 py-3 text-left transition-colors",
+                    blockDurationWeeks === option.value
+                      ? "border-accent bg-accent/10"
+                      : "tile hover:bg-secondary"
+                  )}
+                >
+                  <div className="font-medium text-foreground">{option.label}</div>
+                  <div className="text-xs text-muted-foreground">{option.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            <h3 className="text-sm font-semibold text-foreground">How many blocks should I plan?</h3>
+            <div className="flex flex-col gap-2">
+              {BLOCK_COUNT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setBlockCount(option.value)}
+                  className={cn(
+                    "rounded-xl border px-4 py-3 text-left transition-colors",
+                    blockCount === option.value
+                      ? "border-accent bg-accent/10"
+                      : "tile hover:bg-secondary"
+                  )}
+                >
+                  <div className="font-medium text-foreground">{option.label}</div>
+                  <div className="text-xs text-muted-foreground">{option.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            That&apos;s{" "}
+            <span className="font-medium text-foreground">
+              {blockDurationWeeks * blockCount} weeks
+            </span>{" "}
+            of training mapped out — about{" "}
+            {Math.round((blockDurationWeeks * blockCount) / 4.345)} months.
+          </p>
+
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={() => setStep("monthly")}>
+              Back
+            </Button>
+            <Button className="flex-1" onClick={() => setStep("block_style")}>
+              Continue
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === "block_style" && (
+        <div className="flex flex-col gap-6">
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-semibold text-foreground">
+              How should those blocks feel?
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Last two questions — then I&apos;ll build your plan.
+            </p>
+          </div>
+
+          <div className="space-y-2.5">
+            <h3 className="text-sm font-semibold text-foreground">Focus</h3>
+            <div className="flex flex-col gap-2">
+              {BLOCK_FOCUS_STYLE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setBlockFocusStyle(option.value)}
+                  className={cn(
+                    "rounded-xl border px-4 py-3 text-left transition-colors",
+                    blockFocusStyle === option.value
+                      ? "border-accent bg-accent/10"
+                      : "tile hover:bg-secondary"
+                  )}
+                >
+                  <div className="font-medium text-foreground">{option.label}</div>
+                  <div className="text-xs text-muted-foreground">{option.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            <h3 className="text-sm font-semibold text-foreground">Recovery weeks</h3>
+            <div className="flex flex-col gap-2">
+              {DELOAD_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setDeloadPreference(option.value)}
+                  className={cn(
+                    "rounded-xl border px-4 py-3 text-left transition-colors",
+                    deloadPreference === option.value
+                      ? "border-accent bg-accent/10"
+                      : "tile hover:bg-secondary"
+                  )}
+                >
+                  <div className="font-medium text-foreground">{option.label}</div>
+                  <div className="text-xs text-muted-foreground">{option.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={() => setStep("block_structure")}>
               Back
             </Button>
             <Button className="flex-1" onClick={submit}>
@@ -437,11 +711,15 @@ function StepProgress({ step, showMusclePriorities }: { step: Step; showMusclePr
   const steps: Step[] = [
     "primary_goal",
     ...(showMusclePriorities ? (["muscle_priorities"] as Step[]) : []),
+    "training_days",
     "workout_preferences",
     "equipment",
     "experience",
+    "injuries",
     "bodyweight",
     "monthly",
+    "block_structure",
+    "block_style",
   ];
   const currentIndex = steps.indexOf(step);
   return (

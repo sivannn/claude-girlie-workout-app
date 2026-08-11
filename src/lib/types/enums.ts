@@ -149,3 +149,49 @@ export const EQUIPMENT_TYPES = [
   "bands",
 ] as const;
 export type EquipmentType = (typeof EQUIPMENT_TYPES)[number];
+
+// ---------------------------------------------------------------------------
+// Block periodization
+// ---------------------------------------------------------------------------
+
+// Anatomical muscle group, tagged alongside the existing workoutCategory
+// (which is a *training-day* grouping, e.g. chest_triceps). Block
+// periodization selects by muscle group and day, so both axes are needed:
+// an Overhead Press is workoutCategory "chest_triceps" but muscleGroup
+// "shoulders".
+export const MUSCLE_GROUPS = ["chest", "back", "legs", "shoulders", "arms", "core"] as const;
+export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
+
+export const DIFFICULTY_TIERS = ["beginner", "intermediate", "advanced"] as const;
+export type DifficultyTier = (typeof DIFFICULTY_TIERS)[number];
+
+export const EXERCISE_TYPES = ["compound", "isolation", "accessory"] as const;
+export type ExerciseType = (typeof EXERCISE_TYPES)[number];
+
+// Joints/areas a user can flag as injured or limited. A fixed checklist (not
+// free text) because exercise filtering keys off these — the free-text note
+// collected alongside is shown to the user, never parsed.
+export const INJURY_AREAS = ["knee", "shoulder", "lower_back", "wrist", "hip"] as const;
+export type InjuryArea = (typeof INJURY_AREAS)[number];
+
+// The training emphasis of one block. Prescriptions (reps/sets/rest) come
+// from src/lib/engine/blockPrescriptions.ts.
+export const BLOCK_FOCUSES = ["hypertrophy", "strength", "power", "conditioning"] as const;
+export type BlockFocus = (typeof BLOCK_FOCUSES)[number];
+
+// How blocks are sequenced across a plan.
+export const BLOCK_FOCUS_STYLES = ["balanced", "specialized"] as const;
+export type BlockFocusStyle = (typeof BLOCK_FOCUS_STYLES)[number];
+
+// How deloads are scheduled. "scheduled" plans a lighter final week into each
+// block; "when_needed" leaves the engine's existing reactive stall-deload in
+// charge; "minimal" keeps deloads rare.
+export const DELOAD_PREFERENCES = ["scheduled", "when_needed", "minimal"] as const;
+export type DeloadPreference = (typeof DELOAD_PREFERENCES)[number];
+
+// The weekly training split a plan is built on.
+export const WEEKLY_SPLITS = ["full_body", "upper_lower", "push_pull_legs"] as const;
+export type WeeklySplit = (typeof WEEKLY_SPLITS)[number];
+
+export const PLAN_STATUSES = ["ACTIVE", "COMPLETED", "ARCHIVED"] as const;
+export type PlanStatus = (typeof PLAN_STATUSES)[number];
