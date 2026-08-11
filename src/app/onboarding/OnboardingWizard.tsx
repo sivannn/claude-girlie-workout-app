@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,8 +120,8 @@ export function OnboardingWizard() {
 
       {step === "welcome" && (
         <div className="flex flex-col gap-6">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-alex text-lg font-semibold text-alex-foreground">
-            A
+          <span className="relative h-12 w-12 overflow-hidden rounded-full">
+            <Image src="/coach-alex.png" alt="Alex" fill sizes="48px" className="object-cover" />
           </span>
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">

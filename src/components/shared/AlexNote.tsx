@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 /**
@@ -20,8 +21,8 @@ export function AlexNote({
     <div
       className={cn("tile flex gap-3 rounded-xl border p-4", className)}
     >
-      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-alex text-[11px] font-semibold text-alex-foreground">
-        A
+      <span className="relative mt-0.5 h-6 w-6 shrink-0 overflow-hidden rounded-full">
+        <Image src="/coach-alex.png" alt="Alex" fill sizes="24px" className="object-cover" />
       </span>
       <div className="min-w-0 flex-1">
         {title ? (
