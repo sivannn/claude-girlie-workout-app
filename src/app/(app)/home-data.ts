@@ -1,5 +1,6 @@
 import "server-only";
 import { getCurrentUser } from "@/lib/auth";
+import { getActivePlan } from "@/lib/data/plan-service";
 import { prisma } from "@/lib/prisma";
 import {
   getMonthlyGoalStatus,
@@ -146,8 +147,13 @@ export async function getHomeData() {
   });
   const insightText = insightFact ? await generateHomeInsight(insightFact) : null;
 
+  // While a plan is active it drives what the user sees; the stateless
+  // recommendation engine stays as the fallback for anyone without one.
+  const activePlan = await getActivePlan(user.id, now);
+
   return {
     userName: user.name,
+    activePlan,
     recommendation,
     recommendationReason,
     recommendedBucket,

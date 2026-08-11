@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
+import { createPlanForUser } from "@/lib/data/plan-service";
 import { prisma } from "@/lib/prisma";
 import {
   BLOCK_FOCUS_STYLES,
@@ -41,19 +42,37 @@ export type SettingsInput = {
 };
 
 /**
- * Answers that change what a generated training plan should look like.
- * Editing any of them will prompt the user to regenerate (Phase 4b) rather
- * than silently rewriting a plan they're partway through.
+ * Whether the edit changed anything the training plan is built from. When it
+ * did, the UI asks whether to regenerate rather than silently rewriting a
+ * plan the user is partway through (equipment counts: it decides which
+ * exercises are even possible).
  */
-export const PLAN_RELEVANT_FIELDS = [
-  "primaryGoal",
-  "trainingDaysPerWeek",
-  "injuryAreas",
-  "blockDurationWeeks",
-  "blockCount",
-  "blockFocusStyle",
-  "deloadPreference",
-] as const;
+function planRelevantChange(
+  previous: {
+    primaryGoal: string | null;
+    trainingDaysPerWeek: number | null;
+    injuryAreas: string | null;
+    blockDurationWeeks: number | null;
+    blockCount: number | null;
+    blockFocusStyle: string | null;
+    deloadPreference: string | null;
+    equipmentAccess: string | null;
+    experienceLevel: string | null;
+  },
+  next: SettingsInput & { normalizedInjuries: string | null }
+): boolean {
+  return (
+    previous.primaryGoal !== next.primaryGoal ||
+    previous.trainingDaysPerWeek !== next.trainingDaysPerWeek ||
+    previous.injuryAreas !== next.normalizedInjuries ||
+    previous.blockDurationWeeks !== next.blockDurationWeeks ||
+    previous.blockCount !== next.blockCount ||
+    previous.blockFocusStyle !== next.blockFocusStyle ||
+    previous.deloadPreference !== next.deloadPreference ||
+    previous.equipmentAccess !== next.equipmentAccess ||
+    previous.experienceLevel !== next.experienceLevel
+  );
+}
 
 /**
  * Saves edited questionnaire answers from Profile > Account Settings.
@@ -64,7 +83,14 @@ export const PLAN_RELEVANT_FIELDS = [
  * the value actually changed, so the Progress chart doesn't fill with
  * duplicate entries every time something unrelated is edited.
  */
-export async function updateQuestionnaireAnswers(input: SettingsInput): Promise<void> {
+export type SettingsSaveResult = {
+  /** True when the edit changed something the active plan was built from. */
+  planNeedsRegeneration: boolean;
+};
+
+export async function updateQuestionnaireAnswers(
+  input: SettingsInput
+): Promise<SettingsSaveResult> {
   const user = await getCurrentUser();
 
   // SQLite has no CHECK constraints — the application boundary is the only
@@ -111,6 +137,11 @@ export async function updateQuestionnaireAnswers(input: SettingsInput): Promise<
   const musclePriorities =
     input.primaryGoal === "build_muscle" ? [...new Set(input.musclePriorities)] : [];
   const workoutPreferences = [...new Set(input.workoutPreferences)];
+  const normalizedInjuries =
+    input.injuryAreas.length > 0 ? JSON.stringify([...new Set(input.injuryAreas)]) : null;
+
+  // Snapshot before the write so plan-relevant changes can be detected after.
+  const previousPreferences = user.preferences;
 
   await prisma.userPreferences.update({
     where: { userId: user.id },
@@ -125,7 +156,7 @@ export async function updateQuestionnaireAnswers(input: SettingsInput): Promise<
       monthlyWorkoutTarget,
       topPriorityCategory: musclePriorities[0] ?? null,
       trainingDaysPerWeek,
-      injuryAreas: input.injuryAreas.length > 0 ? JSON.stringify([...new Set(input.injuryAreas)]) : null,
+      injuryAreas: normalizedInjuries,
       injuryNote: input.injuryNote?.trim().slice(0, 280) || null,
       blockDurationWeeks,
       blockCount,
@@ -142,5 +173,35 @@ export async function updateQuestionnaireAnswers(input: SettingsInput): Promise<
     });
   }
 
+  revalidatePath("/", "layout");
+
+  const activePlan = await prisma.trainingPlan.findFirst({
+    where: { userId: user.id, status: "ACTIVE" },
+    select: { id: true },
+  });
+  return {
+    planNeedsRegeneration:
+      activePlan != null &&
+      planRelevantChange(
+        {
+          primaryGoal: previousPreferences?.primaryGoal ?? null,
+          trainingDaysPerWeek: previousPreferences?.trainingDaysPerWeek ?? null,
+          injuryAreas: previousPreferences?.injuryAreas ?? null,
+          blockDurationWeeks: previousPreferences?.blockDurationWeeks ?? null,
+          blockCount: previousPreferences?.blockCount ?? null,
+          blockFocusStyle: previousPreferences?.blockFocusStyle ?? null,
+          deloadPreference: previousPreferences?.deloadPreference ?? null,
+          equipmentAccess: previousPreferences?.equipmentAccess ?? null,
+          experienceLevel: previousPreferences?.experienceLevel ?? null,
+        },
+        { ...input, trainingDaysPerWeek, blockDurationWeeks, blockCount, normalizedInjuries }
+      ),
+  };
+}
+
+/** Rebuilds the plan from the current answers, starting today. */
+export async function regeneratePlan(): Promise<void> {
+  const user = await getCurrentUser();
+  await createPlanForUser(user.id);
   revalidatePath("/", "layout");
 }
