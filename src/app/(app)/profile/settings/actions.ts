@@ -4,13 +4,19 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
+  BLOCK_FOCUS_STYLES,
+  DELOAD_PREFERENCES,
   EQUIPMENT_ACCESS_OPTIONS,
   EXPERIENCE_LEVELS,
+  INJURY_AREAS,
   PRIMARY_GOALS,
   TRAINING_CATEGORIES,
   WORKOUT_PREFERENCES,
+  type BlockFocusStyle,
+  type DeloadPreference,
   type EquipmentAccess,
   type ExperienceLevel,
+  type InjuryArea,
   type PrimaryGoal,
   type TrainingCategory,
   type WorkoutPreference,
@@ -24,7 +30,30 @@ export type SettingsInput = {
   experienceLevel: ExperienceLevel;
   bodyWeightLb: number | null;
   monthlyWorkoutTarget: number;
+  // Block Periodization answers.
+  trainingDaysPerWeek: number;
+  injuryAreas: InjuryArea[];
+  injuryNote: string | null;
+  blockDurationWeeks: number;
+  blockCount: number;
+  blockFocusStyle: BlockFocusStyle;
+  deloadPreference: DeloadPreference;
 };
+
+/**
+ * Answers that change what a generated training plan should look like.
+ * Editing any of them will prompt the user to regenerate (Phase 4b) rather
+ * than silently rewriting a plan they're partway through.
+ */
+export const PLAN_RELEVANT_FIELDS = [
+  "primaryGoal",
+  "trainingDaysPerWeek",
+  "injuryAreas",
+  "blockDurationWeeks",
+  "blockCount",
+  "blockFocusStyle",
+  "deloadPreference",
+] as const;
 
 /**
  * Saves edited questionnaire answers from Profile > Account Settings.
@@ -50,6 +79,20 @@ export async function updateQuestionnaireAnswers(input: SettingsInput): Promise<
   if (!input.workoutPreferences.every((v) => WORKOUT_PREFERENCES.includes(v))) {
     throw new Error("Invalid workout preference.");
   }
+  if (!input.injuryAreas.every((v) => INJURY_AREAS.includes(v))) {
+    throw new Error("Invalid injury area.");
+  }
+  if (!BLOCK_FOCUS_STYLES.includes(input.blockFocusStyle)) throw new Error("Invalid block focus style.");
+  if (!DELOAD_PREFERENCES.includes(input.deloadPreference)) throw new Error("Invalid deload preference.");
+  const trainingDaysPerWeek = Number.isFinite(input.trainingDaysPerWeek)
+    ? Math.min(6, Math.max(2, Math.round(input.trainingDaysPerWeek)))
+    : 3;
+  const blockDurationWeeks = Number.isFinite(input.blockDurationWeeks)
+    ? Math.min(8, Math.max(4, Math.round(input.blockDurationWeeks)))
+    : 6;
+  const blockCount = Number.isFinite(input.blockCount)
+    ? Math.min(4, Math.max(2, Math.round(input.blockCount)))
+    : 3;
   // Reject rather than clamp: a silently rewritten weight would append a
   // fabricated entry to the body-weight chart.
   const bodyWeightLb =
@@ -81,6 +124,13 @@ export async function updateQuestionnaireAnswers(input: SettingsInput): Promise<
       bodyWeightLb,
       monthlyWorkoutTarget,
       topPriorityCategory: musclePriorities[0] ?? null,
+      trainingDaysPerWeek,
+      injuryAreas: input.injuryAreas.length > 0 ? JSON.stringify([...new Set(input.injuryAreas)]) : null,
+      injuryNote: input.injuryNote?.trim().slice(0, 280) || null,
+      blockDurationWeeks,
+      blockCount,
+      blockFocusStyle: input.blockFocusStyle,
+      deloadPreference: input.deloadPreference,
     },
   });
 

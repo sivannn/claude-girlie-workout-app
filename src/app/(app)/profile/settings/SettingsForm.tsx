@@ -8,15 +8,24 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import {
+  BLOCK_COUNT_OPTIONS,
+  BLOCK_DURATION_OPTIONS,
+  BLOCK_FOCUS_STYLE_OPTIONS,
+  DELOAD_OPTIONS,
   EQUIPMENT_OPTIONS,
   EXPERIENCE_OPTIONS,
+  INJURY_OPTIONS,
   MUSCLE_PRIORITY_OPTIONS,
   PRIMARY_GOAL_OPTIONS,
+  TRAINING_DAYS_OPTIONS,
   WORKOUT_PREFERENCE_OPTIONS,
 } from "@/lib/data/questionnaire-options";
 import type {
+  BlockFocusStyle,
+  DeloadPreference,
   EquipmentAccess,
   ExperienceLevel,
+  InjuryArea,
   PrimaryGoal,
   TrainingCategory,
   WorkoutPreference,
@@ -99,6 +108,13 @@ export function SettingsForm({ initial }: { initial: SettingsInput }) {
     initial.bodyWeightLb != null ? String(initial.bodyWeightLb) : ""
   );
   const [monthlyTarget, setMonthlyTarget] = useState(initial.monthlyWorkoutTarget);
+  const [trainingDaysPerWeek, setTrainingDaysPerWeek] = useState(initial.trainingDaysPerWeek);
+  const [injuryAreas, setInjuryAreas] = useState<InjuryArea[]>(initial.injuryAreas);
+  const [injuryNote, setInjuryNote] = useState(initial.injuryNote ?? "");
+  const [blockDurationWeeks, setBlockDurationWeeks] = useState(initial.blockDurationWeeks);
+  const [blockCount, setBlockCount] = useState(initial.blockCount);
+  const [blockFocusStyle, setBlockFocusStyle] = useState<BlockFocusStyle>(initial.blockFocusStyle);
+  const [deloadPreference, setDeloadPreference] = useState<DeloadPreference>(initial.deloadPreference);
   const [status, setStatus] = useState<"idle" | "saved" | "error" | "weight_error">("idle");
   const [isPending, startTransition] = useTransition();
 
@@ -119,6 +135,13 @@ export function SettingsForm({ initial }: { initial: SettingsInput }) {
           experienceLevel,
           bodyWeightLb: bodyWeight ? Number(bodyWeight) : null,
           monthlyWorkoutTarget: monthlyTarget,
+          trainingDaysPerWeek,
+          injuryAreas,
+          injuryNote: injuryNote.trim() || null,
+          blockDurationWeeks,
+          blockCount,
+          blockFocusStyle,
+          deloadPreference,
         });
         setStatus("saved");
       } catch {
@@ -161,6 +184,47 @@ export function SettingsForm({ initial }: { initial: SettingsInput }) {
           </div>
         </Section>
       )}
+
+      <Section title="Training days per week">
+        <div className="flex flex-col gap-2">
+          {TRAINING_DAYS_OPTIONS.map((o) => (
+            <OptionRow
+              key={o.value}
+              selected={trainingDaysPerWeek === o.value}
+              label={o.label}
+              hint={o.hint}
+              onClick={() => setTrainingDaysPerWeek(o.value)}
+            />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Injuries and limitations">
+        <p className="text-xs text-muted-foreground">
+          Movements that load these areas are left out of your plan. Alex isn&apos;t a medical
+          professional — check with one if you&apos;re working through an injury.
+        </p>
+        <div className="flex flex-col gap-2">
+          {INJURY_OPTIONS.map((o) => (
+            <OptionRow
+              key={o.value}
+              multi
+              selected={injuryAreas.includes(o.value)}
+              label={o.label}
+              hint={o.hint}
+              onClick={() => setInjuryAreas((prev) => toggleValue(prev, o.value))}
+            />
+          ))}
+        </div>
+        {injuryAreas.length > 0 ? (
+          <Input
+            placeholder="Anything else I should know? (optional)"
+            value={injuryNote}
+            onChange={(e) => setInjuryNote(e.target.value)}
+            maxLength={280}
+          />
+        ) : null}
+      </Section>
 
       <Section title="Workouts you enjoy">
         <div className="flex flex-col gap-2">
@@ -238,6 +302,62 @@ export function SettingsForm({ initial }: { initial: SettingsInput }) {
             step={1}
             onValueChange={([v]) => setMonthlyTarget(v)}
           />
+        </div>
+      </Section>
+
+      <Section title="Block length">
+        <div className="flex flex-col gap-2">
+          {BLOCK_DURATION_OPTIONS.map((o) => (
+            <OptionRow
+              key={o.value}
+              selected={blockDurationWeeks === o.value}
+              label={o.label}
+              hint={o.hint}
+              onClick={() => setBlockDurationWeeks(o.value)}
+            />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Number of blocks">
+        <div className="flex flex-col gap-2">
+          {BLOCK_COUNT_OPTIONS.map((o) => (
+            <OptionRow
+              key={o.value}
+              selected={blockCount === o.value}
+              label={o.label}
+              hint={o.hint}
+              onClick={() => setBlockCount(o.value)}
+            />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Block focus">
+        <div className="flex flex-col gap-2">
+          {BLOCK_FOCUS_STYLE_OPTIONS.map((o) => (
+            <OptionRow
+              key={o.value}
+              selected={blockFocusStyle === o.value}
+              label={o.label}
+              hint={o.hint}
+              onClick={() => setBlockFocusStyle(o.value)}
+            />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Recovery weeks">
+        <div className="flex flex-col gap-2">
+          {DELOAD_OPTIONS.map((o) => (
+            <OptionRow
+              key={o.value}
+              selected={deloadPreference === o.value}
+              label={o.label}
+              hint={o.hint}
+              onClick={() => setDeloadPreference(o.value)}
+            />
+          ))}
         </div>
       </Section>
 

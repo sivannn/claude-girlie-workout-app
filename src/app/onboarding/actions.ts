@@ -10,8 +10,11 @@ import {
 } from "@/lib/engine";
 import type { EngineExercise, EngineExercisePreference, EngineWorkoutType } from "@/lib/engine/types";
 import type {
+  BlockFocusStyle,
+  DeloadPreference,
   EquipmentAccess,
   ExperienceLevel,
+  InjuryArea,
   MovementCategory,
   PrimaryGoal,
   TrainingCategory,
@@ -28,6 +31,14 @@ export type OnboardingInput = {
   musclePriorities: TrainingCategory[];
   workoutPreferences: WorkoutPreference[];
   equipmentAccess: EquipmentAccess;
+  // Block Periodization answers.
+  trainingDaysPerWeek: number;
+  injuryAreas: InjuryArea[];
+  injuryNote: string | null;
+  blockDurationWeeks: number;
+  blockCount: number;
+  blockFocusStyle: BlockFocusStyle;
+  deloadPreference: DeloadPreference;
 };
 
 export type FirstWorkoutPreview = {
@@ -56,6 +67,13 @@ export async function completeOnboarding(
         input.workoutPreferences.length > 0 ? JSON.stringify(input.workoutPreferences) : null,
       equipmentAccess: input.equipmentAccess,
       topPriorityCategory: input.musclePriorities[0] ?? null,
+      trainingDaysPerWeek: input.trainingDaysPerWeek,
+      injuryAreas: input.injuryAreas.length > 0 ? JSON.stringify(input.injuryAreas) : null,
+      injuryNote: input.injuryNote,
+      blockDurationWeeks: input.blockDurationWeeks,
+      blockCount: input.blockCount,
+      blockFocusStyle: input.blockFocusStyle,
+      deloadPreference: input.deloadPreference,
       onboardingCompletedAt: new Date(),
     },
   });

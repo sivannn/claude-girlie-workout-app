@@ -1,6 +1,30 @@
 import type { PrismaClient } from "@/generated/prisma/client";
-import { EXERCISE_LIBRARY } from "@/lib/data/exercises";
+import { EXERCISE_LIBRARY, type ExerciseSeed } from "@/lib/data/exercises";
+import { EXERCISE_INSTRUCTIONS } from "@/lib/data/exercise-instructions";
 import { WORKOUT_TYPE_LIBRARY } from "@/lib/data/workout-types";
+
+/**
+ * Library row shape, including the periodization tags and the seeded
+ * how-to text (so the Info button never has to call the AI for a library
+ * exercise, and never caches a generic fallback when the API is down).
+ */
+function exerciseFields(ex: ExerciseSeed) {
+  return {
+    name: ex.name,
+    workoutCategory: ex.workoutCategory,
+    movementCategory: ex.movementCategory,
+    kind: ex.kind,
+    repRangeLow: ex.repRangeLow,
+    repRangeHigh: ex.repRangeHigh,
+    defaultIncrementLb: ex.defaultIncrementLb,
+    equipment: ex.equipment,
+    muscleGroup: ex.muscleGroup,
+    exerciseType: ex.exerciseType,
+    difficultyTier: ex.difficultyTier,
+    contraindications: JSON.stringify(ex.contraindications),
+    instructions: EXERCISE_INSTRUCTIONS[ex.name] ?? null,
+  };
+}
 
 // WorkoutType and Exercise are per-user rows (see prisma/schema.prisma), so
 // every account needs its own copy of the library before the app can
@@ -75,42 +99,17 @@ export async function provisionUserLibrary(
     await prisma.exercise.createMany({
       data: EXERCISE_LIBRARY.map((ex) => ({
         userId,
-        name: ex.name,
-        workoutCategory: ex.workoutCategory,
-        movementCategory: ex.movementCategory,
-        kind: ex.kind,
-        repRangeLow: ex.repRangeLow,
-        repRangeHigh: ex.repRangeHigh,
-        defaultIncrementLb: ex.defaultIncrementLb,
-        equipment: ex.equipment,
+        ...exerciseFields(ex),
         isCustom: false,
       })),
     });
   } else {
     for (const ex of EXERCISE_LIBRARY) {
+      const fields = exerciseFields(ex);
       await prisma.exercise.upsert({
         where: { userId_name: { userId, name: ex.name } },
-        update: {
-          workoutCategory: ex.workoutCategory,
-          movementCategory: ex.movementCategory,
-          kind: ex.kind,
-          repRangeLow: ex.repRangeLow,
-          repRangeHigh: ex.repRangeHigh,
-          defaultIncrementLb: ex.defaultIncrementLb,
-          equipment: ex.equipment,
-        },
-        create: {
-          userId,
-          name: ex.name,
-          workoutCategory: ex.workoutCategory,
-          movementCategory: ex.movementCategory,
-          kind: ex.kind,
-          repRangeLow: ex.repRangeLow,
-          repRangeHigh: ex.repRangeHigh,
-          defaultIncrementLb: ex.defaultIncrementLb,
-          equipment: ex.equipment,
-          isCustom: false,
-        },
+        update: fields,
+        create: { userId, ...fields, isCustom: false },
       });
     }
   }

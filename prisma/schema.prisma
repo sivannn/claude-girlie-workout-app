@@ -74,6 +74,17 @@ model UserPreferences {
   experienceLevel String? // "new" | "under_1_year" | "one_to_three_years" | "three_plus_years"
   bodyWeightLb    Float?
 
+  // Block Periodization questionnaire — Phase 1 (baseline).
+  trainingDaysPerWeek Int? // 2-6; drives the weekly split (full body / upper-lower / PPL)
+  injuryAreas         String? // JSON-encoded InjuryArea[] - exercises loading these joints are filtered out
+  injuryNote          String? // free-text detail, shown back to the user; never parsed for filtering
+
+  // Block Periodization questionnaire — Phase 2 (periodization preferences).
+  blockDurationWeeks Int? // 4-8 weeks per block
+  blockCount         Int? // how many blocks the generated plan runs for
+  blockFocusStyle    String? // "balanced" | "specialized"
+  deloadPreference   String? // "scheduled" | "when_needed" | "minimal"
+
   // Collected during onboarding to personalize goal-setting and exercise selection.
   primaryGoal        String? // "build_muscle" | "lose_fat" | "build_strength" | "stay_active" | "other"
   musclePriorities   String? // JSON-encoded TrainingCategory[] - only collected when primaryGoal is "build_muscle"
@@ -187,8 +198,15 @@ model Exercise {
   defaultIncrementLb  Float?
   equipment           String? // "barbell" | "dumbbell" | "cable" | "machine" | "bodyweight" | "bands" - filters recommendations by the user's equipmentAccess
   isCustom            Boolean  @default(false)
-  instructions        String? // AI-generated "how to perform" text, cached on first request
+  instructions        String? // "how to perform" text: seeded for library exercises, AI-generated on first request for custom ones
   createdAt           DateTime @default(now())
+
+  // Block-periodization tags (see src/lib/types/enums.ts). muscleGroup is the
+  // anatomical mover, distinct from workoutCategory's training-day grouping.
+  muscleGroup       String? // "chest" | "back" | "legs" | "shoulders" | "arms" | "core"
+  difficultyTier    String? // "beginner" | "intermediate" | "advanced"
+  exerciseType      String? // "compound" | "isolation" | "accessory"
+  contraindications String? // JSON-encoded InjuryArea[] - joints this lift loads, matched against the user's flagged injuries
 
   workoutExercises WorkoutExercise[]
   goals            Goal[]
