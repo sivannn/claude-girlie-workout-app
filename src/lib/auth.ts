@@ -1,22 +1,50 @@
+import "server-only";
+import { cache } from "react";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth-server";
+import { provisionUserLibrary } from "@/lib/data/provisioning";
 import { prisma } from "@/lib/prisma";
 
-const DEFAULT_USER_EMAIL = "sivsivlevy@gmail.com";
+/**
+ * The session for the current request, or null when signed out. Cached per
+ * request so a layout, page, and actions sharing one render don't repeat the
+ * session lookup.
+ */
+export const getSessionUser = cache(async () => {
+  const session = await auth.api.getSession({ headers: await headers() });
+  return session?.user ?? null;
+});
 
 /**
- * Single-user placeholder for real auth. Every Server Component/Action calls
- * this instead of reading a session, so swapping in real multi-user auth
- * later is a one-function change — the rest of the app already scopes every
- * query by userId.
+ * The signed-in user with preferences, for Server Components and Actions.
+ * Redirects to /login when there is no session — every caller can keep
+ * assuming a user exists, exactly as under the old single-user placeholder.
  */
 export async function getCurrentUser() {
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { email: DEFAULT_USER_EMAIL },
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) {
+    redirect("/login");
+  }
+  let user = await prisma.user.findUnique({
+    where: { id: sessionUser.id },
     include: { preferences: true },
   });
+  if (!user) {
+    // A valid session for a since-deleted user: treat as signed out.
+    redirect("/login");
+  }
+  if (!user.preferences) {
+    // Signup's provisioning hook failed partway (it isn't transactional) —
+    // the preferences row is written last as its completion marker, so
+    // re-run the idempotent provisioning until it succeeds. Costs nothing
+    // once the account is healthy.
+    await provisionUserLibrary(prisma, user.id);
+    user = await prisma.user.findUnique({
+      where: { id: sessionUser.id },
+      include: { preferences: true },
+    });
+    if (!user) redirect("/login");
+  }
   return user;
-}
-
-export async function getCurrentUserId(): Promise<string> {
-  const user = await getCurrentUser();
-  return user.id;
 }

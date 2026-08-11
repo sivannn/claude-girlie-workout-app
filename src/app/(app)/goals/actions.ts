@@ -262,7 +262,9 @@ export async function acceptGoalSuggestion(input: {
 }) {
   const user = await getCurrentUser();
   const { startingValue, currentBest } = await getExerciseStartAndBest(input.exerciseId, user.id);
-  const exercise = await prisma.exercise.findFirstOrThrow({ where: { id: input.exerciseId } });
+  const exercise = await prisma.exercise.findFirstOrThrow({
+    where: { id: input.exerciseId, userId: user.id },
+  });
   const unit = exercise.kind === "CARDIO" ? "mi" : "lb";
 
   await prisma.goal.create({
@@ -283,6 +285,13 @@ export async function acceptGoalSuggestion(input: {
 
 export async function dismissGoalSuggestion(completedGoalId: string) {
   const user = await getCurrentUser();
+  // The memory key embeds a client-supplied goal id — only record dismissals
+  // for goals that are actually the user's.
+  const goal = await prisma.goal.findFirst({
+    where: { id: completedGoalId, userId: user.id },
+    select: { id: true },
+  });
+  if (!goal) return;
   await prisma.coachMemory.upsert({
     where: { userId_key: { userId: user.id, key: `goal_suggestion_dismissed:${completedGoalId}` } },
     update: {},

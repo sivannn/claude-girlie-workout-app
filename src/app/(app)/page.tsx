@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AlexNote } from "@/components/shared/AlexNote";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { ProgressBarLabeled } from "@/components/shared/ProgressBarLabeled";
@@ -174,6 +175,11 @@ export default async function HomePage() {
       ) : null}
 
       {data.insightText ? <AlexNote title="Coach's Insight">{data.insightText}</AlexNote> : null}
+
+      {/* Temporary until the Phase 2 Profile page exists. */}
+      <div className="flex justify-center pt-2">
+        <SignOutButton />
+      </div>
     </div>
   );
 }

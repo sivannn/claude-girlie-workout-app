@@ -23,11 +23,18 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String?  @unique
-  createdAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  // Managed by Better Auth (email verification is not enabled in v1, but the
+  // adapter requires the column).
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
 
+  sessions            Session[]
+  accounts            Account[]
   preferences         UserPreferences?
   workoutTypes        WorkoutType[]
   exercises           Exercise[]
@@ -69,6 +76,70 @@ model UserPreferences {
 
   createdAt DateTime @updatedAt
   updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Auth (Better Auth: email + password with database-backed sessions)
+//
+// Field names follow Better Auth's canonical table schema so the Prisma
+// adapter maps without per-field configuration. Ids are uuids for consistency
+// with the rest of the schema (generateId: "uuid" in src/lib/auth-server.ts).
+// ---------------------------------------------------------------------------
+
+model Session {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id @default(uuid())
+  accountId             String
+  providerId            String // "credential" for email + password
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  password              String? // scrypt hash, managed by Better Auth
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now()) @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(uuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@index([identifier])
+}
+
+// Better Auth's rate-limit counters. Stored in the database (not the default
+// in-memory map) because serverless instances each keep their own memory —
+// shared storage is what makes the signup/login limits actually global.
+model RateLimit {
+  id          String @id @default(uuid())
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+
+  @@map("rateLimit")
 }
 
 // ---------------------------------------------------------------------------

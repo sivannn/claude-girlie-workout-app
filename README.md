@@ -15,12 +15,20 @@ evidence-based progression logic, then phrases the coaching copy in natural lang
 
 ```bash
 npm install
-npm run db:migrate   # apply the Prisma schema to prisma/dev.db
-npm run db:seed       # seed the default user, workout types, and exercise library
+cp .env.example .env  # then set BETTER_AUTH_SECRET (openssl rand -base64 33)
+npm run db:migrate    # apply the Prisma schema to prisma/dev.db
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) and **sign up** — accounts are
+real now (Better Auth, email + password). Signup automatically provisions your
+workout-type and exercise library and drops you into the intro questionnaire.
+
+`npm run db:seed` still exists as a dev convenience: it creates a passwordless
+legacy account with the library pre-seeded. To turn seeded data into a real
+login (or move pre-auth data onto an account), see
+`scripts/migrate-legacy-user.ts`. Forgot a password? There's no email reset at
+friend scale — run `npx tsx scripts/reset-password.ts <email> <new-password>`.
 
 To enable Alex's AI-generated briefs/recaps/insights, add your key to `.env`:
 
@@ -48,5 +56,8 @@ Without a key, the app falls back to templated coaching copy so it never breaks.
   never computes numbers itself.
 - `src/lib/design/categories.ts` — the two-level workout category color system, shared by
   every page.
-- `prisma/schema.prisma` — data model. Every row is scoped by `userId` so the schema is
-  ready for real multi-user accounts even though v1 seeds a single default user.
+- `src/lib/auth-server.ts` / `src/lib/auth.ts` — Better Auth instance (email +
+  password, 90-day rolling cookie sessions) and the `getCurrentUser()` session
+  helper every server component/action goes through.
+- `prisma/schema.prisma` — data model. Every row is scoped by `userId`; accounts
+  are real multi-user with per-account library provisioning at signup.
