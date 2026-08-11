@@ -40,18 +40,24 @@ export function WeekView({
       <div className="grid grid-cols-7 gap-1.5">
         {days.map((day) => {
           const dayEvents = eventsForDay(day);
+          const isSelected = selectedDay != null && isSameDay(day, selectedDay);
           return (
             <button
               key={day.toISOString()}
               type="button"
-              onClick={() => dayEvents.length > 0 && setSelectedDay(day)}
+              onClick={() => setSelectedDay(day)}
               className={cn(
-                "flex flex-col items-center gap-1.5 rounded-lg py-2 text-xs",
-                isToday(day) && "ring-1 ring-accent"
+                "flex flex-col items-center gap-1.5 rounded-lg border border-border/70 py-2 text-xs transition-colors",
+                isToday(day) && "ring-1 ring-accent",
+                isSelected && "border-transparent bg-foreground"
               )}
             >
-              <span className="text-muted-foreground">{format(day, "EEE")}</span>
-              <span className="font-medium text-foreground">{format(day, "d")}</span>
+              <span className={cn(isSelected ? "text-background/70" : "text-muted-foreground")}>
+                {format(day, "EEE")}
+              </span>
+              <span className={cn("font-medium", isSelected ? "font-semibold text-background" : "text-foreground")}>
+                {format(day, "d")}
+              </span>
               <div className="flex flex-col gap-0.5">
                 {dayEvents.map((e) => {
                   const style = eventStatusStyle(e.colorKey, e.status);

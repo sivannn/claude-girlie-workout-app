@@ -81,11 +81,25 @@ async function reconcileEvents(userId: string, recommendation: NextWorkoutRecomm
 
   if (!recommendation) return;
 
+  // Once per day, not "whenever today looks empty" — otherwise removing or
+  // rescheduling today's coach's pick would be silently undone on the next
+  // page load.
+  const preferences = await prisma.userPreferences.findUnique({
+    where: { userId },
+    select: { lastCoachPickDate: true },
+  });
+  if (preferences?.lastCoachPickDate && isSameDayUTC(preferences.lastCoachPickDate, now)) return;
+
   const todaysEvents = await prisma.workoutEvent.findMany({
     where: { userId, scheduledDate: { gte: startOfToday } },
   });
   const hasTodayEvent = todaysEvents.some((e) => isSameDayUTC(e.scheduledDate, now));
-  if (hasTodayEvent) return;
+  if (hasTodayEvent) {
+    // Something is already on today's calendar — count the day as handled so
+    // deleting that entry later doesn't summon a replacement.
+    await prisma.userPreferences.updateMany({ where: { userId }, data: { lastCoachPickDate: now } });
+    return;
+  }
 
   await prisma.workoutEvent.create({
     data: {
@@ -96,6 +110,7 @@ async function reconcileEvents(userId: string, recommendation: NextWorkoutRecomm
       createdBy: "AI",
     },
   });
+  await prisma.userPreferences.updateMany({ where: { userId }, data: { lastCoachPickDate: now } });
 }
 
 export async function getCalendarMonthData(monthDate: Date) {

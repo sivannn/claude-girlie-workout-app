@@ -64,6 +64,12 @@ model UserPreferences {
   topPriorityCategory   String? // e.g. "glutes_legs" - highest fitness priority, informs exercise selection
   onboardingCompletedAt DateTime?
 
+  // Day the calendar reconciler last auto-created its "coach's pick" planned
+  // event. Makes that creation once-per-day instead of whenever today has no
+  // event — otherwise removing or rescheduling today's suggestion would be
+  // undone on the next page load.
+  lastCoachPickDate DateTime?
+
   // Collected during onboarding to calibrate first-workout starting weights.
   experienceLevel String? // "new" | "under_1_year" | "one_to_three_years" | "three_plus_years"
   bodyWeightLb    Float?

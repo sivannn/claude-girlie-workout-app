@@ -3,6 +3,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { movementCategoryLabel } from "@/lib/data/movement-labels";
+import { deleteCompletedWorkout } from "@/lib/data/workout-removal";
 import { parseLocalDateInput } from "@/lib/utils/date";
 
 export type WorkoutDetailSet = {
@@ -124,12 +125,88 @@ export async function getWorkoutDetail(workoutId: string): Promise<WorkoutDetail
   };
 }
 
-/** Missed-workout reschedule: remove the missed event, create a new planned one at the chosen date. */
-export async function rescheduleEvent(eventId: string, newDate: string) {
+/**
+ * The earliest day a workout may be scheduled for.
+ *
+ * "Today" is the user's today, not the server's: deployed servers run in UTC
+ * while the calendar UI is built from the browser's clock, so a Pacific
+ * evening is already tomorrow on the server and a strict server-side check
+ * would reject the very day the UI just offered. The client passes its local
+ * date; we accept it as long as it is within a day of the server's, which
+ * keeps a forged value from backdating events arbitrarily.
+ */
+function earliestAllowedDate(clientToday: string | undefined): Date {
+  const now = new Date();
+  const serverToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (!clientToday) return serverToday;
+  const claimed = parseLocalDateInput(clientToday);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const withinOneDay = Math.abs(claimed.getTime() - serverToday.getTime()) <= dayMs;
+  return withinOneDay ? claimed : serverToday;
+}
+
+/**
+ * User-initiated scheduling from the calendar day sheet: one planned event on
+ * a chosen day. Today or future only — the reconciler auto-misses anything
+ * scheduled in the past, so allowing it would create instantly-missed events.
+ */
+export async function scheduleWorkout(
+  workoutTypeId: string,
+  dateInput: string,
+  clientToday?: string
+): Promise<void> {
+  const user = await getCurrentUser();
+  await prisma.workoutType.findFirstOrThrow({ where: { id: workoutTypeId, userId: user.id } });
+  const date = parseLocalDateInput(dateInput);
+  if (date < earliestAllowedDate(clientToday)) {
+    throw new Error("Workouts can only be scheduled for today or a future day.");
+  }
+  await prisma.workoutEvent.create({
+    data: {
+      userId: user.id,
+      workoutTypeId,
+      scheduledDate: date,
+      status: "PLANNED",
+      createdBy: "USER",
+    },
+  });
+}
+
+/** Removes a planned (or missed) event — the not-yet-done kind. Completed workouts go through removeCompletedWorkout. */
+export async function removePlannedEvent(eventId: string): Promise<void> {
+  const user = await getCurrentUser();
+  await prisma.workoutEvent.deleteMany({
+    where: { id: eventId, userId: user.id, status: { in: ["PLANNED", "MISSED"] } },
+  });
+}
+
+/**
+ * Hard-deletes a completed workout and syncs every surface that referenced
+ * it — semantics and rationale live with the implementation in
+ * src/lib/data/workout-removal.ts, where they are unit-tested.
+ */
+export async function removeCompletedWorkout(workoutId: string): Promise<void> {
+  const user = await getCurrentUser();
+  const removed = await deleteCompletedWorkout(prisma, user.id, workoutId);
+  if (!removed) {
+    throw new Error("Workout not found.");
+  }
+}
+
+/**
+ * Moves a planned workout to another day, or revives a missed one. Deletes
+ * the old event and creates a fresh planned one so createdBy correctly
+ * becomes USER either way.
+ */
+export async function rescheduleEvent(eventId: string, newDate: string, clientToday?: string) {
   const user = await getCurrentUser();
   const event = await prisma.workoutEvent.findFirstOrThrow({
-    where: { id: eventId, userId: user.id, status: "MISSED" },
+    where: { id: eventId, userId: user.id, status: { in: ["PLANNED", "MISSED"] } },
   });
+  const date = parseLocalDateInput(newDate);
+  if (date < earliestAllowedDate(clientToday)) {
+    throw new Error("Workouts can only be rescheduled to today or a future day.");
+  }
 
   await prisma.$transaction([
     prisma.workoutEvent.delete({ where: { id: event.id } }),
@@ -137,7 +214,7 @@ export async function rescheduleEvent(eventId: string, newDate: string) {
       data: {
         userId: user.id,
         workoutTypeId: event.workoutTypeId,
-        scheduledDate: parseLocalDateInput(newDate),
+        scheduledDate: date,
         status: "PLANNED",
         createdBy: "USER",
       },

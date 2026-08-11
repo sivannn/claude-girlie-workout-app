@@ -40,19 +40,26 @@ export function MonthGrid({
           const isRecommended = dayEvents.some(
             (e) => e.workoutTypeId === recommendedWorkoutTypeId && e.status === "PLANNED"
           );
+          const isSelected = selectedDay != null && isSameDay(day, selectedDay);
           return (
             <button
               key={day.toISOString()}
               type="button"
-              onClick={() => dayEvents.length > 0 && setSelectedDay(day)}
+              onClick={() => setSelectedDay(day)}
               className={cn(
-                "flex aspect-square flex-col items-center justify-start gap-0.5 rounded-lg p-1 text-xs",
-                !isSameMonth(day, monthDate) && "opacity-30",
+                // Every day is an outlined, tappable box (spec: rounded box
+                // outline by default; selected flips to a light background
+                // with dark text).
+                "flex aspect-square flex-col items-center justify-start gap-0.5 rounded-lg border border-border/70 p-1 text-xs transition-colors",
+                !isSameMonth(day, monthDate) && !isSelected && "opacity-30",
                 isToday(day) && "ring-1 ring-accent",
-                isRecommended && "bg-accent/10"
+                isRecommended && "bg-accent/10",
+                isSelected && "border-transparent bg-foreground"
               )}
             >
-              <span className="text-foreground">{format(day, "d")}</span>
+              <span className={cn(isSelected ? "font-semibold text-background" : "text-foreground")}>
+                {format(day, "d")}
+              </span>
               <div className="flex flex-wrap justify-center gap-0.5">
                 {dayEvents.slice(0, 4).map((e) => {
                   const style = eventStatusStyle(e.colorKey, e.status);
