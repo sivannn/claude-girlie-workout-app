@@ -30,7 +30,7 @@ import type {
   TrainingCategory,
   WorkoutPreference,
 } from "@/lib/types/enums";
-import { updateQuestionnaireAnswers, type SettingsInput } from "./actions";
+import { regeneratePlan, updateQuestionnaireAnswers, type SettingsInput } from "./actions";
 
 function toggleValue<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -116,6 +116,8 @@ export function SettingsForm({ initial }: { initial: SettingsInput }) {
   const [blockFocusStyle, setBlockFocusStyle] = useState<BlockFocusStyle>(initial.blockFocusStyle);
   const [deloadPreference, setDeloadPreference] = useState<DeloadPreference>(initial.deloadPreference);
   const [status, setStatus] = useState<"idle" | "saved" | "error" | "weight_error">("idle");
+  const [showRegeneratePrompt, setShowRegeneratePrompt] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const save = () => {
@@ -127,7 +129,7 @@ export function SettingsForm({ initial }: { initial: SettingsInput }) {
     }
     startTransition(async () => {
       try {
-        await updateQuestionnaireAnswers({
+        const result = await updateQuestionnaireAnswers({
           primaryGoal,
           musclePriorities,
           workoutPreferences,
@@ -144,6 +146,8 @@ export function SettingsForm({ initial }: { initial: SettingsInput }) {
           deloadPreference,
         });
         setStatus("saved");
+        // Never silently rewrite a plan the user is partway through — ask.
+        if (result.planNeedsRegeneration) setShowRegeneratePrompt(true);
       } catch {
         setStatus("error");
       }
@@ -381,6 +385,45 @@ export function SettingsForm({ initial }: { initial: SettingsInput }) {
           </p>
         ) : null}
       </div>
+
+      {showRegeneratePrompt ? (
+        <div className="tile space-y-3 rounded-xl border p-4">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-foreground">
+              Rebuild your training plan with these answers?
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Your current plan was built from your old answers. Rebuilding starts a fresh plan from
+              today — everything you&apos;ve already logged stays exactly as it is.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              disabled={regenerating}
+              onClick={async () => {
+                setRegenerating(true);
+                try {
+                  await regeneratePlan();
+                  setShowRegeneratePrompt(false);
+                } finally {
+                  setRegenerating(false);
+                }
+              }}
+            >
+              {regenerating ? "Rebuilding…" : "Rebuild my plan"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={regenerating}
+              onClick={() => setShowRegeneratePrompt(false)}
+            >
+              Keep my current plan
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

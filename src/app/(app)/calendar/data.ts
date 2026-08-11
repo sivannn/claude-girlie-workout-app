@@ -1,6 +1,7 @@
 import "server-only";
 import { endOfMonth, endOfWeek, startOfMonth, startOfWeek } from "date-fns";
 import { getCurrentUser } from "@/lib/auth";
+import { getActivePlan, materializePlanWeek } from "@/lib/data/plan-service";
 import { prisma } from "@/lib/prisma";
 import {
   getWeeklyGoalStatus,
@@ -65,10 +66,13 @@ async function computeRecommendation(userId: string): Promise<NextWorkoutRecomme
  * ensures today has a planned event reflecting the coach's current
  * recommendation if nothing is planned or completed yet.
  */
-async function reconcileEvents(userId: string, recommendation: NextWorkoutRecommendation | null) {
+/**
+ * Overdue planned workouts become missed. Runs whether or not a plan is
+ * active — a plan owns *scheduling*, but nothing else marks the past.
+ */
+async function markOverdueAsMissed(userId: string) {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
   const overduePlanned = await prisma.workoutEvent.findMany({
     where: { userId, status: "PLANNED", scheduledDate: { lt: startOfToday } },
   });
@@ -78,6 +82,11 @@ async function reconcileEvents(userId: string, recommendation: NextWorkoutRecomm
       data: { status: "MISSED" },
     });
   }
+}
+
+async function reconcileEvents(userId: string, recommendation: NextWorkoutRecommendation | null) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   if (!recommendation) return;
 
@@ -116,7 +125,17 @@ async function reconcileEvents(userId: string, recommendation: NextWorkoutRecomm
 export async function getCalendarMonthData(monthDate: Date) {
   const user = await getCurrentUser();
   const recommendation = await computeRecommendation(user.id);
-  await reconcileEvents(user.id, recommendation);
+
+  await markOverdueAsMissed(user.id);
+
+  // An active plan owns the schedule: its sessions go on the calendar and the
+  // single-day "coach's pick" reconciler stands down so the two don't fight.
+  const activePlan = await getActivePlan(user.id);
+  if (activePlan) {
+    await materializePlanWeek(user.id, activePlan);
+  } else {
+    await reconcileEvents(user.id, recommendation);
+  }
 
   const gridStart = startOfWeek(startOfMonth(monthDate), { weekStartsOn: 1 });
   const gridEnd = endOfWeek(endOfMonth(monthDate), { weekStartsOn: 1 });

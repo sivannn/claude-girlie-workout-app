@@ -80,6 +80,53 @@ export default async function HomePage() {
         </div>
       ) : null}
 
+      {data.activePlan ? (
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold text-foreground">Your Plan</h2>
+            <span className="text-xs text-muted-foreground">
+              Week {data.activePlan.position.totalWeekIndex} of {data.activePlan.durationWeeks}
+            </span>
+          </div>
+          <div className="tile space-y-3 rounded-xl border p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-semibold text-accent-text">
+                {data.activePlan.currentBlock.focusLabel}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Block {data.activePlan.currentBlock.orderIndex + 1} of {data.activePlan.blockCount} · week{" "}
+                {data.activePlan.position.weekInBlock} of {data.activePlan.currentBlock.durationWeeks}
+              </span>
+              {data.activePlan.position.isDeloadWeek ? (
+                <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                  Recovery week
+                </span>
+              ) : null}
+            </div>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {data.activePlan.position.isDeloadWeek
+                ? "Recovery week — take about 15% off your working weights and stop a rep or two short of failure, so you start the next block fresh."
+                : data.activePlan.currentBlock.focusDescription}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {data.activePlan.splitLabel} · {data.activePlan.trainingDaysPerWeek} days a week ·{" "}
+              {data.activePlan.currentBlock.setsLow}–{data.activePlan.currentBlock.setsHigh} sets of{" "}
+              {data.activePlan.currentBlock.repRangeLow}–{data.activePlan.currentBlock.repRangeHigh} reps
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {data.activePlan.weekDays.map((day) => (
+                <span
+                  key={day.dayIndex}
+                  className="rounded-md border border-border px-2 py-1 text-xs text-foreground"
+                >
+                  {day.dayLabel}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">Weekly Goals</h2>
         <div className="flex flex-col gap-2">

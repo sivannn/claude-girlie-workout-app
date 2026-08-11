@@ -22,6 +22,7 @@ import type {
 } from "@/lib/types/enums";
 import { movementCategoryLabel } from "@/lib/data/movement-labels";
 import { filterExercisesByEquipment } from "@/lib/data/equipment";
+import { createPlanForUser } from "@/lib/data/plan-service";
 
 export type OnboardingInput = {
   experienceLevel: ExperienceLevel;
@@ -82,6 +83,15 @@ export async function completeOnboarding(
     await prisma.bodyWeightLog.create({
       data: { userId: user.id, date: new Date(), weightLb: input.bodyWeightLb },
     });
+  }
+
+  // Build the Block Periodization plan from the answers just saved. A failure
+  // here must not strand the user mid-onboarding — the app falls back to the
+  // per-session recommendation engine, and they can regenerate from settings.
+  try {
+    await createPlanForUser(user.id);
+  } catch (error) {
+    console.error("Plan generation failed during onboarding:", error);
   }
 
   const workoutTypes = (await prisma.workoutType.findMany({

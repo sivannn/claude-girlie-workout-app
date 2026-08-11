@@ -46,6 +46,7 @@ model User {
   bodyWeightLogs      BodyWeightLog[]
   coachMemories       CoachMemory[]
   coachInsights       CoachInsight[]
+  trainingPlans       TrainingPlan[]
 }
 
 model UserPreferences {
@@ -211,6 +212,7 @@ model Exercise {
   workoutExercises WorkoutExercise[]
   goals            Goal[]
   preferences      ExercisePreference[]
+  planDayExercises PlanDayExercise[]
 
   @@unique([userId, name])
 }
@@ -265,6 +267,86 @@ model GoalMilestone {
   value      Float
   order      Int
   achievedAt DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// Block periodization plans
+//
+// A plan stores *intent* — which muscle groups on which day, which exercises,
+// and the rep/set prescription for the block. Concrete weights are never
+// stored here: they are resolved at workout time by src/lib/engine/
+// progression.ts against real logged history, so a plan written weeks ago
+// can't contradict what the user is actually lifting today.
+// ---------------------------------------------------------------------------
+
+model TrainingPlan {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name                String
+  goal                String // PrimaryGoal the plan was generated for
+  split               String // "full_body" | "upper_lower" | "push_pull_legs"
+  trainingDaysPerWeek Int
+  durationWeeks       Int
+  status              String   @default("ACTIVE") // ACTIVE | COMPLETED | ARCHIVED
+  startedAt           DateTime @default(now())
+  completedAt         DateTime?
+  createdAt           DateTime @default(now())
+
+  blocks PlanBlock[]
+
+  @@index([userId, status])
+}
+
+model PlanBlock {
+  id     String       @id @default(uuid())
+  planId String
+  plan   TrainingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  orderIndex    Int
+  focus         String // "hypertrophy" | "strength" | "power" | "conditioning"
+  durationWeeks Int
+  hasDeloadWeek Boolean @default(false)
+
+  // Prescription for every exercise in this block.
+  setsLow          Int
+  setsHigh         Int
+  repRangeLow      Int
+  repRangeHigh     Int
+  restSecondsLow   Int
+  restSecondsHigh  Int
+
+  days PlanDay[]
+
+  @@index([planId, orderIndex])
+}
+
+model PlanDay {
+  id      String    @id @default(uuid())
+  blockId String
+  block   PlanBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  dayIndex        Int // position within the training week
+  dayOffset       Int // days from the start of the week (spacing rest days)
+  dayLabel        String // "Push" | "Upper Body" | "Full Body" ...
+  muscleGroupsJson String // JSON-encoded MuscleGroup[]
+
+  exercises PlanDayExercise[]
+
+  @@index([blockId, dayIndex])
+}
+
+model PlanDayExercise {
+  id        String  @id @default(uuid())
+  planDayId String
+  planDay   PlanDay @relation(fields: [planDayId], references: [id], onDelete: Cascade)
+
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  orderIndex Int
+
+  @@index([planDayId, orderIndex])
 }
 
 // ---------------------------------------------------------------------------
