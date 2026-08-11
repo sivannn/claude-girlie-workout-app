@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AlexNote } from "@/components/shared/AlexNote";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { ProgressBarLabeled } from "@/components/shared/ProgressBarLabeled";
@@ -41,6 +40,13 @@ export default async function HomePage() {
 
   return (
     <div className="flex flex-col gap-8">
+      <header className="pt-1">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground text-balance">
+          Welcome back, {data.userName}.
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">Ready when you are.</p>
+      </header>
+
       {data.draftWorkout ? (
         <Button size="lg" variant="outline" className="w-full text-base" asChild>
           <Link href={`/workout/new?resume=${data.draftWorkout.id}`}>
@@ -175,11 +181,6 @@ export default async function HomePage() {
       ) : null}
 
       {data.insightText ? <AlexNote title="Coach's Insight">{data.insightText}</AlexNote> : null}
-
-      {/* Temporary until the Phase 2 Profile page exists. */}
-      <div className="flex justify-center pt-2">
-        <SignOutButton />
-      </div>
     </div>
   );
 }

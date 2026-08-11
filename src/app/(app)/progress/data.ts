@@ -100,9 +100,15 @@ export async function getProgressPageData() {
     }));
 
   // Personal records: current best per exercise, all-time (not windowed).
+  // The same scan also feeds the "Your Journey" stats ported from the removed
+  // History page (first-ever weight vs best-ever = most improved).
   const allTimeSets = await prisma.workoutSet.findMany({
     where: { actualWeight: { not: null }, workoutExercise: { workout: { userId: user.id } } },
-    include: { workoutExercise: { select: { exerciseId: true, exercise: { select: { name: true } } } } },
+    include: {
+      workoutExercise: {
+        select: { exerciseId: true, exercise: { select: { name: true } }, workout: { select: { date: true } } },
+      },
+    },
   });
   const personalRecords = new Map<string, { name: string; best: number }>();
   for (const s of allTimeSets) {
@@ -112,6 +118,36 @@ export async function getProgressPageData() {
       personalRecords.set(id, { name: s.workoutExercise.exercise.name, best: s.actualWeight! });
     }
   }
+
+  const typeFrequency = new Map<string, number>();
+  for (const w of allWorkouts) {
+    typeFrequency.set(w.workoutType.name, (typeFrequency.get(w.workoutType.name) ?? 0) + 1);
+  }
+  const mostFrequentType = [...typeFrequency.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  const firstAndBest = new Map<string, { name: string; firstDate: number; first: number; best: number }>();
+  for (const s of allTimeSets) {
+    const id = s.workoutExercise.exerciseId;
+    const date = s.workoutExercise.workout.date.getTime();
+    const weight = s.actualWeight!;
+    const entry = firstAndBest.get(id);
+    if (!entry) {
+      firstAndBest.set(id, { name: s.workoutExercise.exercise.name, firstDate: date, first: weight, best: weight });
+    } else {
+      if (date < entry.firstDate) {
+        entry.firstDate = date;
+        entry.first = weight;
+      } else if (date === entry.firstDate) {
+        // Same first session: its best working set is the baseline.
+        entry.first = Math.max(entry.first, weight);
+      }
+      entry.best = Math.max(entry.best, weight);
+    }
+  }
+  const mostImproved =
+    [...firstAndBest.values()]
+      .map((e) => ({ name: e.name, delta: Math.round((e.best - e.first) * 10) / 10 }))
+      .sort((a, b) => b.delta - a.delta)[0] ?? null;
   const cardioBests = await prisma.workout.groupBy({
     by: ["workoutTypeId"],
     where: { userId: user.id, cardioDistanceMiles: { not: null } },
@@ -155,6 +191,11 @@ export async function getProgressPageData() {
   const overviewInsight = insightFact ? await generateHomeInsight(insightFact) : null;
 
   return {
+    journey: {
+      totalWorkouts: allWorkouts.length,
+      mostImprovedExercise: mostImproved && mostImproved.delta > 0 ? mostImproved : null,
+      mostFrequentType,
+    },
     overviewInsight,
     activeGoals: activeGoals.map((g) => ({
       id: g.id,
@@ -171,7 +212,8 @@ export async function getProgressPageData() {
       monthlyCompleted: monthly.completedCount,
       monthlyTarget: monthly.target,
       weeklyCompleted: Object.values(weekly).filter((w) => w.completed).length,
-      weeklyTarget: 4,
+      weeklyTarget:
+        weeklyTargets.legDay + weeklyTargets.upperBody + weeklyTargets.cardio + weeklyTargets.fun,
       weeklyFrequency: [...weekBuckets.entries()]
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([week, count]) => ({ week, count })),
