@@ -190,7 +190,37 @@ export async function getProgressPageData() {
   });
   const overviewInsight = insightFact ? await generateHomeInsight(insightFact) : null;
 
+  // Calorie tracking over the same 100-day window as the other charts.
+  const [mealDays, burnedAgg] = await Promise.all([
+    prisma.meal.groupBy({
+      by: ["date"],
+      where: { userId: user.id, date: { gte: windowStart } },
+      _sum: { calories: true },
+    }),
+    prisma.workout.aggregate({
+      where: { userId: user.id, date: { gte: windowStart }, caloriesBurned: { not: null } },
+      _sum: { caloriesBurned: true },
+    }),
+  ]);
+  const dailyTarget = preferences?.dailyCalorieTarget ?? null;
+  const loggedDays = mealDays.length;
+  const totalConsumed = mealDays.reduce((sum, d) => sum + (d._sum.calories ?? 0), 0);
+  const calories =
+    loggedDays > 0
+      ? {
+          dailyTarget,
+          loggedDays,
+          averagePerDay: Math.round(totalConsumed / loggedDays),
+          daysWithinTarget:
+            dailyTarget != null
+              ? mealDays.filter((d) => (d._sum.calories ?? 0) <= dailyTarget).length
+              : null,
+          totalBurned: burnedAgg._sum.caloriesBurned ?? 0,
+        }
+      : null;
+
   return {
+    calories,
     journey: {
       totalWorkouts: allWorkouts.length,
       mostImprovedExercise: mostImproved && mostImproved.delta > 0 ? mostImproved : null,

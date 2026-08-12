@@ -3,6 +3,7 @@ export * from "./movementPatterns";
 export * from "./exerciseSelection";
 export * from "./progression";
 export * from "./generateWorkout";
+export * from "./caloriesBurned";
 export * from "./recommendation";
 export * from "./goals";
 export * from "./weeklyGoals";

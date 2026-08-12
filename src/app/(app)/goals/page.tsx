@@ -8,12 +8,14 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { AddGoalDialog } from "./AddGoalDialog";
+import { DailyCalorieGoal } from "./DailyCalorieGoal";
+import { getCurrentUser } from "@/lib/auth";
 import { ExerciseGoalCard } from "./ExerciseGoalCard";
 import { GoalSuggestionCard } from "./GoalSuggestionCard";
 import { getGoalsPageData } from "./actions";
 
 export default async function GoalsPage() {
-  const data = await getGoalsPageData();
+  const [data, user] = await Promise.all([getGoalsPageData(), getCurrentUser()]);
 
   return (
     <div>
@@ -26,6 +28,8 @@ export default async function GoalsPage() {
         {data.suggestions.map((s) => (
           <GoalSuggestionCard key={s.completedGoalId} suggestion={s} />
         ))}
+
+        <DailyCalorieGoal initial={user.preferences?.dailyCalorieTarget ?? null} />
 
         <AddGoalDialog />
 
