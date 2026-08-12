@@ -27,25 +27,49 @@ export type GeneratedWorkout = {
   abExercise: GeneratedWorkoutExercise | null;
 };
 
+/**
+ * Overrides applied when a block-periodization plan is driving the session:
+ * the block's rep range and set count replace the exercise defaults, and a
+ * planned deload week scales the working weights down.
+ */
+export type PlanOverrides = {
+  repRangeLow: number;
+  repRangeHigh: number;
+  workingSetCount: number;
+  /** e.g. 0.85 during a planned deload week; 1 otherwise. */
+  loadMultiplier: number;
+};
+
 function buildExercise(
   selection: { exercise: EngineExercise; movementCategory: MovementCategory; isRequiredSlot: boolean; reason: string },
   history: EngineExerciseSession[],
   startingWeightHint: number | null | undefined,
   asOfDate: Date,
-  workingSetCount: number
+  workingSetCount: number,
+  planOverrides?: PlanOverrides
 ): GeneratedWorkoutExercise {
   const decision = decideProgression(selection.exercise, history, asOfDate, startingWeightHint);
 
+  const setCount = planOverrides?.workingSetCount ?? workingSetCount;
+  const multiplier = planOverrides?.loadMultiplier ?? 1;
+  // The plan sets the target; progression still decides what that target is
+  // from real logged history, so a deload scales the honest number rather
+  // than inventing one.
+  const targetWeight =
+    decision.recommendedWeight != null
+      ? roundToNearest5(decision.recommendedWeight * multiplier)
+      : decision.recommendedWeight;
+
   const rampedWeights = rampWorkingSetWeights(
-    decision.recommendedWeight,
+    targetWeight,
     selection.exercise.defaultIncrementLb,
-    workingSetCount
+    setCount
   );
-  const workingSets = Array.from({ length: workingSetCount }, (_, i) => ({
+  const workingSets = Array.from({ length: setCount }, (_, i) => ({
     setNumber: i + 1,
     weight: rampedWeights[i],
-    repsLow: decision.recommendedRepsLow,
-    repsHigh: decision.recommendedRepsHigh,
+    repsLow: planOverrides?.repRangeLow ?? decision.recommendedRepsLow,
+    repsHigh: planOverrides?.repRangeHigh ?? decision.recommendedRepsHigh,
   }));
 
   return {
@@ -56,9 +80,54 @@ function buildExercise(
     progressionReason: decision.reason,
     isDeload: decision.isDeload,
     isFirstTime: decision.isFirstTime,
-    warmup: { weight: decision.warmupWeight, reps: decision.warmupReps },
+    warmup: {
+      weight:
+        decision.warmupWeight != null && multiplier !== 1
+          ? roundToNearest5(decision.warmupWeight * multiplier)
+          : decision.warmupWeight,
+      reps: decision.warmupReps,
+    },
     workingSets,
   };
+}
+
+function roundToNearest5(value: number): number {
+  return Math.round(value / 5) * 5;
+}
+
+/**
+ * Builds a session from an explicit exercise list — the one a block
+ * periodization plan prescribes for today — instead of letting the selection
+ * engine choose. Weights still come from the user's logged history via
+ * decideProgression; the plan contributes the exercises, the rep/set
+ * prescription, and any deload scaling.
+ */
+export function generatePlannedWorkout(params: {
+  trainingCategory: TrainingCategory;
+  /** In the order the plan lists them (compounds first). */
+  plannedExercises: Array<{ exercise: EngineExercise; movementCategory: MovementCategory }>;
+  exerciseHistories: Map<string, EngineExerciseSession[]>;
+  startingWeightHints?: Map<string, number>;
+  asOfDate: Date;
+  overrides: PlanOverrides;
+}): GeneratedWorkout {
+  const exercises = params.plannedExercises.map((planned) =>
+    buildExercise(
+      {
+        exercise: planned.exercise,
+        movementCategory: planned.movementCategory,
+        isRequiredSlot: true,
+        reason: "Part of today's plan session",
+      },
+      params.exerciseHistories.get(planned.exercise.id) ?? [],
+      params.startingWeightHints?.get(planned.exercise.id),
+      params.asOfDate,
+      params.overrides.workingSetCount,
+      params.overrides
+    )
+  );
+
+  return { trainingCategory: params.trainingCategory, exercises, abExercise: null };
 }
 
 /**
