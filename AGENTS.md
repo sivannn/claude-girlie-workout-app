@@ -60,10 +60,13 @@ the estimate.
 - Rotating an existing `BETTER_AUTH_SECRET` on a live app — it signs out every
   logged-in user.
 
-## Still needed from Sivan
+## Optional, not blocking
 
-- **The app icon logo.** `src/app/icon.png`, `apple-icon.png`, `favicon.ico`,
-  and `public/steam-logo.png` are placeholders. Sizes are in
-  `src/app/manifest.ts` and must match whatever replaces them.
-- **The calendar screenshots** she mentioned — the day-cell styling was built
-  from a written description and should be checked against what she had in mind.
+- **App icons are already done.** `src/app/icon.png`, `apple-icon.png`,
+  `favicon.ico` and `public/steam-logo.png` are Sivan's real Steam logo, added
+  in "Rename app from Bloom to Steam and add new logo". Nothing to replace. If
+  they are ever swapped, the sizes declared in `src/app/manifest.ts` must match
+  the new files.
+- **Calendar day-cell styling** was built from a written description rather
+  than the screenshots it referenced. It's worth an eyeball against what was
+  intended, but it isn't blocking anything.
