@@ -34,6 +34,8 @@ export function StartWorkoutFlow({
   const [phase, setPhase] = useState<Phase>(initialTypeId || initialResumeId ? "loading" : "select");
   const [session, setSession] = useState<GeneratedSessionData | null>(null);
   const [recap, setRecap] = useState<{ text: string; prs: string[] } | null>(null);
+  // Surfaced when finishing fails so a completed workout is never silently lost.
+  const [finishError, setFinishError] = useState<string | null>(null);
   const [draftEventId, setDraftEventId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftWeightliftingPayload | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<PickerGroup | null>(initialCategory);
@@ -97,49 +99,73 @@ export function StartWorkoutFlow({
   ) => {
     if (!session || session.mode !== "weightlifting") return;
     setPhase("finishing");
-    const result = await completeWorkout({
-      mode: "weightlifting",
-      workoutTypeId: session.workoutTypeId,
-      durationMinutes: elapsedMinutes(),
-      removedExerciseIds,
-      draftEventId,
-      exercises: exercises.map((e) => ({
-        exerciseId: e.exerciseId,
-        movementCategory: e.movementCategory,
-        reasonSelected: e.selectionReason,
-        warmupWeight: e.warmup.weight,
-        warmupReps: e.warmup.reps,
-        sets: e.sets,
-      })),
-    });
-    setRecap({ text: result.recap, prs: result.prsAchieved });
-    setPhase("recap");
+    try {
+      const result = await completeWorkout({
+        mode: "weightlifting",
+        workoutTypeId: session.workoutTypeId,
+        durationMinutes: elapsedMinutes(),
+        removedExerciseIds,
+        draftEventId,
+        exercises: exercises.map((e) => ({
+          exerciseId: e.exerciseId,
+          movementCategory: e.movementCategory,
+          reasonSelected: e.selectionReason,
+          warmupWeight: e.warmup.weight,
+          warmupReps: e.warmup.reps,
+          sets: e.sets,
+        })),
+      });
+      setRecap({ text: result.recap, prs: result.prsAchieved });
+      setPhase("recap");
+    } catch {
+      // Finishing failed — most likely an expired session or a dropped
+      // connection. Never swallow a completed workout: go back to the session
+      // with everything still filled in so it can be retried.
+      setFinishError(
+        "Couldn't save that workout — you may have been signed out. Your sets are still here; log back in in another tab and press Finish again."
+      );
+      setPhase("session");
+    }
   };
 
   const handleFinishCardio = async (result: CardioResult) => {
     if (!session || session.mode !== "cardio") return;
     setPhase("finishing");
-    const outcome = await completeWorkout({
-      mode: "cardio",
-      workoutTypeId: session.workoutTypeId,
-      durationMinutes: elapsedMinutes(),
-      ...result,
-    });
-    setRecap({ text: outcome.recap, prs: outcome.prsAchieved });
-    setPhase("recap");
+    try {
+      const outcome = await completeWorkout({
+        mode: "cardio",
+        workoutTypeId: session.workoutTypeId,
+        durationMinutes: elapsedMinutes(),
+        ...result,
+      });
+      setRecap({ text: outcome.recap, prs: outcome.prsAchieved });
+      setPhase("recap");
+    } catch {
+      setFinishError(
+        "Couldn't save that workout — you may have been signed out. Nothing you entered is lost; log back in in another tab and press Finish again."
+      );
+      setPhase("session");
+    }
   };
 
   const handleFinishSimple = async (result: { notes: string | null }) => {
     if (!session || session.mode !== "simple") return;
     setPhase("finishing");
-    const outcome = await completeWorkout({
-      mode: "simple",
-      workoutTypeId: session.workoutTypeId,
-      durationMinutes: elapsedMinutes(),
-      notes: result.notes,
-    });
-    setRecap({ text: outcome.recap, prs: outcome.prsAchieved });
-    setPhase("recap");
+    try {
+      const outcome = await completeWorkout({
+        mode: "simple",
+        workoutTypeId: session.workoutTypeId,
+        durationMinutes: elapsedMinutes(),
+        notes: result.notes,
+      });
+      setRecap({ text: outcome.recap, prs: outcome.prsAchieved });
+      setPhase("recap");
+    } catch {
+      setFinishError(
+        "Couldn't save that workout — you may have been signed out. Nothing you entered is lost; log back in in another tab and press Finish again."
+      );
+      setPhase("session");
+    }
   };
 
   if (phase === "select") {
@@ -182,21 +208,45 @@ export function StartWorkoutFlow({
 
   const finishing = phase === "finishing";
 
+  // Shown above the session when a finish attempt failed, so the user knows
+  // their logged work is still here and what to do about it.
+  const finishBanner = finishError ? (
+    <p
+      className="mb-4 rounded-md bg-destructive/15 px-3 py-2 text-sm font-medium text-foreground"
+      role="alert"
+    >
+      {finishError}
+    </p>
+  ) : null;
+
   if (session.mode === "weightlifting") {
     return (
-      <WeightliftingSession
-        session={session}
-        initialExercises={draft?.exercises}
-        initialAbExercise={draft?.abExercise}
-        initialRemovedIds={draft?.removedExerciseIds}
-        draftEventId={draftEventId}
-        onFinish={handleFinishWeightlifting}
-        finishing={finishing}
-      />
+      <>
+        {finishBanner}
+        <WeightliftingSession
+          session={session}
+          initialExercises={draft?.exercises}
+          initialAbExercise={draft?.abExercise}
+          initialRemovedIds={draft?.removedExerciseIds}
+          draftEventId={draftEventId}
+          onFinish={handleFinishWeightlifting}
+          finishing={finishing}
+        />
+      </>
     );
   }
   if (session.mode === "cardio") {
-    return <CardioSessionForm session={session} onFinish={handleFinishCardio} finishing={finishing} />;
+    return (
+      <>
+        {finishBanner}
+        <CardioSessionForm session={session} onFinish={handleFinishCardio} finishing={finishing} />
+      </>
+    );
   }
-  return <SimpleSessionForm session={session} onFinish={handleFinishSimple} finishing={finishing} />;
+  return (
+    <>
+      {finishBanner}
+      <SimpleSessionForm session={session} onFinish={handleFinishSimple} finishing={finishing} />
+    </>
+  );
 }

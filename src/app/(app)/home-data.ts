@@ -11,6 +11,7 @@ import {
 } from "@/lib/engine";
 import type { EngineWorkoutSummary, EngineWorkoutType } from "@/lib/engine/types";
 import { generateHomeInsight, generateRecommendationReason } from "@/lib/ai/alex";
+import { cachedInsight } from "@/lib/ai/insight-cache";
 import { weeklyGoalBucketForWorkoutType, type WeeklyGoalBucket } from "@/lib/data/workout-types";
 import type { WorkoutCategory } from "@/lib/types/enums";
 
@@ -112,7 +113,13 @@ export async function getHomeData() {
     now
   );
   const recommendationReason = recommendation
-    ? await generateRecommendationReason(recommendation.workoutType.name, recommendation.reason)
+    ? await cachedInsight({
+        userId: user.id,
+        category: "home_insight",
+        facts: { kind: "reason", type: recommendation.workoutType.name, reason: recommendation.reason },
+        generate: () =>
+          generateRecommendationReason(recommendation.workoutType.name, recommendation.reason),
+      })
     : null;
   const recommendedBucket = recommendation
     ? weeklyGoalBucketForWorkoutType(
@@ -145,7 +152,14 @@ export async function getHomeData() {
     monthlyTarget: monthlyStatus.target,
     totalWorkoutCount: recentWorkouts.length,
   });
-  const insightText = insightFact ? await generateHomeInsight(insightFact) : null;
+  const insightText = insightFact
+    ? await cachedInsight({
+        userId: user.id,
+        category: "home_insight",
+        facts: { kind: "insight", ...insightFact },
+        generate: () => generateHomeInsight(insightFact),
+      })
+    : null;
 
   // While a plan is active it drives what the user sees; the stateless
   // recommendation engine stays as the fallback for anyone without one.
@@ -162,7 +176,6 @@ export async function getHomeData() {
     streakStatus,
     recentAchievements,
     insightText,
-    hasAnyWorkouts: recentWorkouts.length > 0,
     draftWorkout,
     bucketStartHref,
   };

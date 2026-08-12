@@ -10,6 +10,7 @@ import {
 } from "@/lib/engine";
 import type { EngineWorkoutSummary } from "@/lib/engine/types";
 import { generateHomeInsight } from "@/lib/ai/alex";
+import { cachedInsight } from "@/lib/ai/insight-cache";
 import type { WorkoutCategory } from "@/lib/types/enums";
 
 const WINDOW_DAYS = 100;
@@ -188,7 +189,14 @@ export async function getProgressPageData() {
     monthlyTarget: monthly.target,
     totalWorkoutCount: allWorkouts.length,
   });
-  const overviewInsight = insightFact ? await generateHomeInsight(insightFact) : null;
+  const overviewInsight = insightFact
+    ? await cachedInsight({
+        userId: user.id,
+        category: "progress_overview",
+        facts: insightFact,
+        generate: () => generateHomeInsight(insightFact),
+      })
+    : null;
 
   // Calorie tracking over the same 100-day window as the other charts.
   const [mealDays, burnedAgg] = await Promise.all([

@@ -11,6 +11,7 @@ import {
 import type { EngineWorkoutSummary, EngineWorkoutType } from "@/lib/engine/types";
 import type { EventStatus, WorkoutCategory } from "@/lib/types/enums";
 import { generateRecommendationReason } from "@/lib/ai/alex";
+import { cachedInsight } from "@/lib/ai/insight-cache";
 
 export type CalendarEvent = {
   id: string;
@@ -160,7 +161,13 @@ export async function getCalendarMonthData(monthDate: Date) {
   }));
 
   const recommendationReason = recommendation
-    ? await generateRecommendationReason(recommendation.workoutType.name, recommendation.reason)
+    ? await cachedInsight({
+        userId: user.id,
+        category: "home_insight",
+        facts: { kind: "reason", type: recommendation.workoutType.name, reason: recommendation.reason },
+        generate: () =>
+          generateRecommendationReason(recommendation.workoutType.name, recommendation.reason),
+      })
     : null;
 
   return {

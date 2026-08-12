@@ -80,6 +80,21 @@ export function WeightliftingSession({
     );
   };
 
+  /** Warm-up actuals, prefilled from the recommendation and editable like any set. */
+  const updateWarmup = (exerciseIndex: number, field: "weight" | "reps", value: string) => {
+    const parsed = parseNumberInput(value);
+    setExercises((prev) =>
+      prev.map((ex, i) =>
+        i !== exerciseIndex ? ex : { ...ex, warmup: { ...ex.warmup, [field]: parsed } }
+      )
+    );
+  };
+
+  const updateAbWarmup = (field: "weight" | "reps", value: string) => {
+    const parsed = parseNumberInput(value);
+    setAbExercise((prev) => (prev ? { ...prev, warmup: { ...prev.warmup, [field]: parsed } } : prev));
+  };
+
   const addSet = (exerciseIndex: number) => {
     setExercises((prev) =>
       prev.map((ex, i) => {
@@ -208,6 +223,7 @@ export function WeightliftingSession({
             canMoveUp={index > 0}
             canMoveDown={index < exercises.length - 1}
             onSetChange={(setIndex, field, value) => updateSet(index, setIndex, field, value)}
+            onWarmupChange={(field, value) => updateWarmup(index, field, value)}
             onAddSet={() => addSet(index)}
             onRemoveSet={(setIndex) => removeSet(index, setIndex)}
             onRemove={() => removeExercise(exercise.exerciseId)}
@@ -231,6 +247,7 @@ export function WeightliftingSession({
                   : prev
               );
             }}
+            onWarmupChange={(field, value) => updateAbWarmup(field, value)}
             onAddSet={() =>
               setAbExercise((prev) => {
                 if (!prev) return prev;

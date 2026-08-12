@@ -19,6 +19,7 @@ export function ExerciseCard({
   canMoveUp,
   canMoveDown,
   onSetChange,
+  onWarmupChange,
   onAddSet,
   onRemoveSet,
   onRemove,
@@ -28,6 +29,7 @@ export function ExerciseCard({
   canMoveUp: boolean;
   canMoveDown: boolean;
   onSetChange: (setIndex: number, field: "actualWeight" | "actualReps", value: string) => void;
+  onWarmupChange: (field: "weight" | "reps", value: string) => void;
   onAddSet: () => void;
   onRemoveSet: (setIndex: number) => void;
   onRemove: () => void;
@@ -116,12 +118,6 @@ export function ExerciseCard({
         </div>
       )}
 
-      {exercise.warmup.weight != null && (
-        <div className="mt-3 text-xs text-muted-foreground">
-          Warm-up: {exercise.warmup.weight} lb × {exercise.warmup.reps}
-        </div>
-      )}
-
       <div className="mt-3 space-y-2">
         <div className="grid grid-cols-[2rem_1fr_1fr_1fr_1.75rem] gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Set</span>
@@ -130,6 +126,35 @@ export function ExerciseCard({
           <span>Reps</span>
           <span />
         </div>
+
+        {/* The warmup is a real, editable row — it's logged like any other
+            set. It stays out of progression math because it's stored on the
+            exercise, not as a WorkoutSet. */}
+        {exercise.warmup.weight != null && (
+          <div className="grid grid-cols-[2rem_1fr_1fr_1fr_1.75rem] items-center gap-2">
+            <span className="text-[11px] font-medium uppercase text-muted-foreground">W</span>
+            <span className="text-sm text-muted-foreground">Warm-up</span>
+            <Input
+              type="number"
+              inputMode="decimal"
+              value={exercise.warmup.weight ?? ""}
+              placeholder="lb"
+              onChange={(e) => onWarmupChange("weight", e.target.value)}
+              className="h-9"
+              aria-label="Warm-up weight"
+            />
+            <Input
+              type="number"
+              inputMode="numeric"
+              value={exercise.warmup.reps ?? ""}
+              placeholder="reps"
+              onChange={(e) => onWarmupChange("reps", e.target.value)}
+              className="h-9"
+              aria-label="Warm-up reps"
+            />
+            <span />
+          </div>
+        )}
         {exercise.sets.map((set, i) => (
           <div key={set.setNumber} className="grid grid-cols-[2rem_1fr_1fr_1fr_1.75rem] items-center gap-2">
             <span className="text-sm text-muted-foreground">{set.setNumber}</span>
