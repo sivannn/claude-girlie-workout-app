@@ -81,6 +81,37 @@ export default async function ProgressPage() {
           </div>
         </section>
 
+        {data.calories ? (
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-foreground">Calories</h2>
+            <p className="text-xs text-muted-foreground">Last 100 days</p>
+            <div className="tile grid grid-cols-2 gap-4 rounded-xl border p-4 sm:grid-cols-3">
+              <StatDisplay
+                value={String(data.calories.averagePerDay)}
+                label="Avg / Day"
+                sublabel={`across ${data.calories.loggedDays} logged day${data.calories.loggedDays === 1 ? "" : "s"}`}
+                size="sm"
+              />
+              <StatDisplay
+                value={
+                  data.calories.daysWithinTarget != null
+                    ? `${data.calories.daysWithinTarget}/${data.calories.loggedDays}`
+                    : "—"
+                }
+                label="Within Goal"
+                sublabel={data.calories.dailyTarget != null ? `${data.calories.dailyTarget} kcal goal` : "no goal set"}
+                size="sm"
+              />
+              <StatDisplay
+                value={String(data.calories.totalBurned)}
+                label="Burned"
+                sublabel="estimated from workouts"
+                size="sm"
+              />
+            </div>
+          </section>
+        ) : null}
+
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-foreground">Workout Balance</h2>
           <p className="text-xs text-muted-foreground">Last 100 days</p>

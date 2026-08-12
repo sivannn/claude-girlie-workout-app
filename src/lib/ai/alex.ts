@@ -266,6 +266,81 @@ export type ExerciseInfoFacts = {
 const GENERIC_FORM_FALLBACK =
   "Focus on controlled form and a full range of motion. Warm up with a lighter weight first, brace your core, and stop a rep or two before your form breaks down. Ask a trainer if you're unsure about setup.";
 
+// ---------------------------------------------------------------------------
+// Meal photo analysis — the only place Alex is asked to produce a number
+// ---------------------------------------------------------------------------
+
+export type MealAnalysis = {
+  name: string;
+  calories: number;
+  /** Alex's own confidence, surfaced so the user knows when to double-check. */
+  confidence: "high" | "medium" | "low";
+  note: string | null;
+};
+
+/**
+ * Identifies a meal from a photo and estimates its calories.
+ *
+ * Deliberately returns null rather than a fallback when there's no API key or
+ * the call fails. Every other function here degrades to templated copy, which
+ * is harmless for prose — but inventing a calorie number would be actively
+ * misleading, so the UI asks the user to enter it manually instead.
+ */
+export async function analyzeMealPhoto(
+  base64Image: string,
+  mediaType: "image/jpeg" | "image/png" | "image/webp"
+): Promise<MealAnalysis | null> {
+  if (!client) return null;
+  try {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 400,
+      system: ALEX_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: mediaType, data: base64Image } },
+            {
+              type: "text",
+              text: `Identify this meal and estimate its total calories.
+
+Respond with ONLY a JSON object, no prose and no code fences:
+{"name": "<short dish name, 3-5 words>", "calories": <integer>, "confidence": "high"|"medium"|"low", "note": "<one short sentence on what you assumed about portion size, or null>"}
+
+Estimate the whole portion shown. If the photo isn't food, set calories to 0, confidence to "low", and say so in note.`,
+            },
+          ],
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((block) => block.type === "text");
+    const raw = textBlock && "text" in textBlock ? textBlock.text.trim() : "";
+    if (!raw) return null;
+
+    // Models occasionally wrap JSON in fences despite instructions.
+    const jsonText = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const parsed = JSON.parse(jsonText) as Partial<MealAnalysis>;
+
+    const calories = Number(parsed.calories);
+    if (!Number.isFinite(calories) || calories < 0 || calories > 10000) return null;
+    const name = typeof parsed.name === "string" ? parsed.name.trim().slice(0, 80) : "";
+    if (!name) return null;
+
+    return {
+      name,
+      calories: Math.round(calories),
+      confidence:
+        parsed.confidence === "high" || parsed.confidence === "low" ? parsed.confidence : "medium",
+      note: typeof parsed.note === "string" && parsed.note.trim() ? parsed.note.trim().slice(0, 200) : null,
+    };
+  } catch (error) {
+    console.error("Meal photo analysis failed:", error);
+    return null;
+  }
+}
+
 export async function generateExerciseInstructions(facts: ExerciseInfoFacts): Promise<string> {
   const prompt = `Write brief step-by-step instructions (3-5 short steps) for how to correctly perform the exercise "${facts.name}"${
     facts.equipment ? ` using ${facts.equipment}` : ""

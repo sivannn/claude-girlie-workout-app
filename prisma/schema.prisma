@@ -47,6 +47,7 @@ model User {
   coachMemories       CoachMemory[]
   coachInsights       CoachInsight[]
   trainingPlans       TrainingPlan[]
+  meals               Meal[]
 }
 
 model UserPreferences {
@@ -60,6 +61,8 @@ model UserPreferences {
   weeklyCardioTarget    Int @default(1)
   weeklyFunTarget       Int @default(1)
   monthlyWorkoutTarget  Int @default(18)
+  // Daily calorie goal for the Calories tab; null until the user sets one.
+  dailyCalorieTarget    Int?
 
   unitSystem            String    @default("imperial") // "imperial" | "metric"
   topPriorityCategory   String? // e.g. "glutes_legs" - highest fitness priority, informs exercise selection
@@ -394,6 +397,12 @@ model Workout {
   notes           String?
 
   // Cardio-specific metrics (null for weightlifting/fun workouts)
+  // Estimated from workout type, duration and body weight (MET-based) unless
+  // the user overrides it. sourced so a future wearable integration can
+  // supply a measured value without changing anything downstream.
+  caloriesBurned       Int?
+  caloriesBurnedSource String? // "estimated" | "manual" | "wearable"
+
   cardioIndoorOutdoor String?
   cardioTimeSeconds   Int?
   cardioDistanceMiles Float?
@@ -454,6 +463,23 @@ model Achievement {
 
   @@index([userId, achievedAt])
   @@index([relatedWorkoutId])
+}
+
+// A logged meal. Photos are analyzed and discarded — only the result is kept,
+// so the app needs no blob storage.
+model Meal {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime
+  name      String
+  calories  Int
+  // "photo" when Claude estimated it from an image, "manual" when typed in.
+  // Kept so the Calories tab can show which numbers were estimated.
+  source    String   @default("manual")
+  createdAt DateTime @default(now())
+
+  @@index([userId, date])
 }
 
 model BodyWeightLog {

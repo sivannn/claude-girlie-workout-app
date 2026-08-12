@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import {
   decideCardioProgression,
   decideProgression,
+  estimateCaloriesBurned,
   estimateStartingWeight,
   generateWeightliftingWorkout,
   generatePlannedWorkout,
@@ -32,6 +33,32 @@ import type {
 import type { DraftWeightliftingPayload } from "./sessionState";
 
 const RECENT_SESSIONS_LIMIT = 5;
+
+/**
+ * MET-based estimate of what a session burned. Stored with its source so a
+ * future wearable integration can replace it with a measured value.
+ */
+async function estimateBurnedFor(
+  userId: string,
+  workoutTypeId: string,
+  durationMinutes: number
+): Promise<{ caloriesBurned: number | null; caloriesBurnedSource: string | null }> {
+  const [type, preferences] = await Promise.all([
+    prisma.workoutType.findUnique({ where: { id: workoutTypeId } }),
+    prisma.userPreferences.findUnique({ where: { userId } }),
+  ]);
+  if (!type) return { caloriesBurned: null, caloriesBurnedSource: null };
+  const caloriesBurned = estimateCaloriesBurned({
+    category: type.category as WorkoutCategory,
+    colorKey: type.colorKey,
+    durationMinutes,
+    bodyWeightLb: preferences?.bodyWeightLb,
+  });
+  return {
+    caloriesBurned,
+    caloriesBurnedSource: caloriesBurned == null ? null : "estimated",
+  };
+}
 
 async function getExerciseHistories(
   userId: string,
@@ -562,6 +589,7 @@ async function completeWeightliftingWorkout(
       workoutTypeId,
       date: now,
       durationMinutes: payload.durationMinutes,
+      ...(await estimateBurnedFor(userId, workoutTypeId, payload.durationMinutes)),
       exercises: {
         create: payload.exercises.map((e, index) => ({
           exerciseId: e.exerciseId,
@@ -758,6 +786,7 @@ async function completeCardioWorkout(
       workoutTypeId,
       date: now,
       durationMinutes: payload.durationMinutes,
+      ...(await estimateBurnedFor(userId, workoutTypeId, payload.durationMinutes)),
       cardioIndoorOutdoor: payload.indoorOutdoor,
       cardioTimeSeconds: payload.timeSeconds,
       cardioDistanceMiles: payload.distanceMiles,
@@ -805,6 +834,7 @@ async function completeSimpleWorkout(
       workoutTypeId,
       date: now,
       durationMinutes: payload.durationMinutes,
+      ...(await estimateBurnedFor(userId, workoutTypeId, payload.durationMinutes)),
       notes: payload.notes,
     },
   });
