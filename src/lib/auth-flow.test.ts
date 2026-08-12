@@ -278,18 +278,45 @@ describe("legacy-user migration script", () => {
     expect(await prisma.user.findUnique({ where: { email: LEGACY_EMAIL } })).not.toBeNull();
   });
 
-  it("refuses to run when TURSO_DATABASE_URL is set (production gate)", () => {
-    const dbPath = copyDevDb("gate.db");
+  it("refuses to WRITE to production without explicit confirmation", () => {
+    // --production selects the remote database; writing to it additionally
+    // requires --confirm-production, so no destructive step can happen by
+    // accident from a shell that happens to have Turso vars set.
     let failed = false;
     try {
-      execFileSync("npx", ["tsx", script, "prepare", "--db", dbPath], {
+      execFileSync("npx", ["tsx", script, "prepare", "--production"], {
         encoding: "utf8",
         env: { ...process.env, TURSO_DATABASE_URL: "libsql://example.turso.io" },
       });
     } catch (e) {
       failed = true;
-      expect((e as { stderr?: string }).stderr).toContain("Refusing to run");
+      expect((e as { stderr?: string }).stderr).toContain("--confirm-production");
     }
     expect(failed).toBe(true);
+  });
+
+  it("inspect is read-only and never needs the production confirmation", () => {
+    const dbPath = copyDevDb("inspect.db");
+    // Local inspect against a copy: proves the command runs and reports
+    // accounts without touching anything.
+    const out = execFileSync("npx", ["tsx", script, "inspect", "--db", dbPath], {
+      encoding: "utf8",
+      env: { ...process.env, TURSO_DATABASE_URL: "" },
+    });
+    expect(out).toContain("Accounts");
+  });
+
+  it("inspect reports when no migration is needed", async () => {
+    // A database whose only account has a real login needs no migration.
+    const { path: dbPath, prisma } = await emptyDb("nomigration.db");
+    const auth = authFor(prisma);
+    await auth.api.signUpEmail({
+      body: { name: "Siv", email: LEGACY_EMAIL, password: "letmelift123" },
+    });
+    const out = execFileSync("npx", ["tsx", script, "inspect", "--db", dbPath], {
+      encoding: "utf8",
+      env: { ...process.env, TURSO_DATABASE_URL: "" },
+    });
+    expect(out).toContain("NO MIGRATION NEEDED");
   });
 });
