@@ -229,6 +229,10 @@ model ExercisePreference {
   exerciseId        String
   exercise          Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   priority          String    @default("MEDIUM") // HIGH | MEDIUM | LOW
+  // What the user says they can already lift, entered up front so a brand-new
+  // exercise doesn't have to spend a session calibrating from a bodyweight
+  // guess. Consulted only when there's no logged history yet.
+  knownStartingWeightLb Float?
   timesRemoved      Int       @default(0)
   timesSelected     Int       @default(0)
   lastRecommendedAt DateTime?

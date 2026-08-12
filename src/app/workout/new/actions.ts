@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getTodaysPlanSession } from "@/lib/data/plan-service";
 import { prisma } from "@/lib/prisma";
 import {
+  adjustWeight,
   decideCardioProgression,
   decideProgression,
   estimateCaloriesBurned,
@@ -12,7 +13,9 @@ import {
   generatePlannedWorkout,
   rampWorkingSetWeights,
   trainingCategoryForWorkoutType,
+  validateAdjustments,
 } from "@/lib/engine";
+import type { AdjustmentContext } from "@/lib/engine/adjustments";
 import type {
   EngineExercise,
   EngineExercisePreference,
@@ -23,7 +26,12 @@ import { movementCategoryLabel } from "@/lib/data/movement-labels";
 import { weeklyGoalBucketForWorkoutType } from "@/lib/data/workout-types";
 import { filterExercisesByEquipment } from "@/lib/data/equipment";
 import type { EquipmentAccess, ExperienceLevel, MovementCategory, WorkoutCategory } from "@/lib/types/enums";
-import { generateExerciseInstructions, generateWorkoutBrief, generateWorkoutRecap } from "@/lib/ai/alex";
+import {
+  generateExerciseInstructions,
+  generateWorkoutBrief,
+  generateWorkoutRecap,
+  suggestWorkoutAdjustments,
+} from "@/lib/ai/alex";
 import type {
   CompleteWorkoutPayload,
   GeneratedExerciseView,
@@ -225,16 +233,24 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
     getLongTermGoals(user.id, allExerciseIds),
   ]);
 
+  // A weight the user told us they can already lift beats a bodyweight-derived
+  // guess; a real logged session beats both.
+  const knownStartingWeights = new Map(
+    preferences
+      .filter((p) => p.knownStartingWeightLb != null)
+      .map((p) => [p.exerciseId, p.knownStartingWeightLb as number])
+  );
   const startingWeightHints = new Map<string, number>();
   for (const ex of [...liftingExercises, ...abExercises]) {
     if (!histories.get(ex.id)?.length) {
       startingWeightHints.set(
         ex.id,
-        estimateStartingWeight(
-          ex.movementCategory as MovementCategory,
-          user.preferences?.experienceLevel as ExperienceLevel | null | undefined,
-          user.preferences?.bodyWeightLb
-        )
+        knownStartingWeights.get(ex.id) ??
+          estimateStartingWeight(
+            ex.movementCategory as MovementCategory,
+            user.preferences?.experienceLevel as ExperienceLevel | null | undefined,
+            user.preferences?.bodyWeightLb
+          )
       );
     }
   }
@@ -347,7 +363,87 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
     substitutions: substitutions.map((s) => ({ from: priorNames.get(s.from) ?? "a previous exercise", to: s.to })),
   });
 
-  return { mode: "weightlifting", ...base, brief, exercises, abExercise };
+  const adjusted = await applyCoachAdjustments(user.id, exercises, histories);
+
+  return { mode: "weightlifting", ...base, brief, exercises: adjusted, abExercise };
+}
+
+/**
+ * Lets Alex nudge a session the engine already computed.
+ *
+ * Every proposal is validated against the user's own logged data and hard
+ * bounds (src/lib/engine/adjustments.ts) before it changes anything, and any
+ * change that survives is labelled on the exercise so the user can see why a
+ * number differs from the plain progression. A failure here is a no-op.
+ */
+async function applyCoachAdjustments(
+  userId: string,
+  exercises: GeneratedExerciseView[],
+  histories: Map<string, EngineExerciseSession[]>
+): Promise<GeneratedExerciseView[]> {
+  try {
+    const preferences = await prisma.exercisePreference.findMany({
+      where: { userId, exerciseId: { in: exercises.map((e) => e.exerciseId) } },
+    });
+    const removalsById = new Map(preferences.map((p) => [p.exerciseId, p.timesRemoved]));
+
+    const contexts: AdjustmentContext[] = exercises.map((e) => ({
+      exerciseId: e.exerciseId,
+      isFirstTime: e.isFirstTime,
+      isDeload: e.isDeload,
+      sessionsAtTopOfRange: countSessionsAtTopOfRange(histories.get(e.exerciseId) ?? []),
+      timesRemoved: removalsById.get(e.exerciseId) ?? 0,
+    }));
+
+    // Nothing in the session is eligible — skip the API call entirely.
+    if (!contexts.some((c) => !c.isFirstTime && !c.isDeload)) return exercises;
+
+    const proposals = await suggestWorkoutAdjustments(
+      exercises.map((e, i) => ({
+        exerciseId: e.exerciseId,
+        name: e.name,
+        recommendedWeight: e.workingSets.at(-1)?.recommendedWeight ?? null,
+        repRange: `${e.workingSets[0]?.recommendedRepsLow ?? "?"}-${e.workingSets[0]?.recommendedRepsHigh ?? "?"}`,
+        lastSessions: e.lastWorkoutSummary ?? "",
+        sessionsAtTopOfRange: contexts[i].sessionsAtTopOfRange,
+        timesRemoved: contexts[i].timesRemoved,
+      }))
+    );
+    if (proposals.length === 0) return exercises;
+
+    const applied = validateAdjustments(proposals, contexts);
+    if (applied.length === 0) return exercises;
+
+    const byId = new Map(applied.map((a) => [a.exerciseId, a]));
+    return exercises.map((e) => {
+      const adjustment = byId.get(e.exerciseId);
+      // A swap is only a signal for future selection, not a live change.
+      if (!adjustment || adjustment.kind === "swap_exercise") return e;
+      return {
+        ...e,
+        coachAdjustment: adjustment.reason,
+        workingSets: e.workingSets.map((s) => ({
+          ...s,
+          recommendedWeight: adjustWeight(s.recommendedWeight, adjustment.appliedMultiplier),
+        })),
+      };
+    });
+  } catch (error) {
+    console.error("Coach adjustments skipped:", error);
+    return exercises;
+  }
+}
+
+/** Consecutive most-recent sessions where every logged set hit the top of the range. */
+function countSessionsAtTopOfRange(sessions: EngineExerciseSession[]): number {
+  let count = 0;
+  for (const session of sessions) {
+    const logged = session.sets.filter((s) => s.actualReps != null && s.recommendedRepsHigh != null);
+    if (logged.length === 0) break;
+    if (logged.every((s) => s.actualReps! >= s.recommendedRepsHigh!)) count++;
+    else break;
+  }
+  return count;
 }
 
 /** Candidate exercises for the "add a different exercise" picker. */

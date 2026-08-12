@@ -111,6 +111,12 @@ export function ExerciseCard({
         {exercise.progressionReason}
       </p>
 
+      {exercise.coachAdjustment ? (
+        <p className="mt-2 rounded-md bg-accent/10 px-2.5 py-1.5 text-xs leading-relaxed text-accent-text">
+          <span className="font-semibold">Alex adjusted this:</span> {exercise.coachAdjustment}
+        </p>
+      ) : null}
+
       {(exercise.lastWorkoutSummary || exercise.longTermGoal) && (
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {exercise.lastWorkoutSummary ? <span>Last time: {exercise.lastWorkoutSummary}</span> : null}

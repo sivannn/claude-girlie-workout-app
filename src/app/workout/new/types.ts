@@ -1,6 +1,11 @@
 export type GeneratedExerciseView = {
   exerciseId: string;
   name: string;
+  /**
+   * Set when Alex proposed an adjustment to this exercise and the engine
+   * validated it — shown to the user so a changed number is never silent.
+   */
+  coachAdjustment?: string | null;
   movementCategory: string;
   movementCategoryLabel: string;
   selectionReason: string;

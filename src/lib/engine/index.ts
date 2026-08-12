@@ -12,3 +12,4 @@ export * from "./streaks";
 export * from "./startingWeights";
 export * from "./cardioProgression";
 export * from "./insights";
+export * from "./adjustments";
