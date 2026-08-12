@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, LineChart, Settings, Target } from "lucide-react";
+import { ChevronRight, Dumbbell, LineChart, Settings, Target } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -10,6 +10,12 @@ export const dynamic = "force-dynamic";
 const HUB_LINKS: Array<{ href: string; label: string; hint: string; icon: LucideIcon }> = [
   { href: "/goals", label: "Goals", hint: "Milestones and targets you're working toward", icon: Target },
   { href: "/progress", label: "Progress", hint: "Strength trends, consistency, and body weight", icon: LineChart },
+  {
+    href: "/profile/starting-weights",
+    label: "Starting Weights",
+    hint: "Tell Alex what you already lift so he starts there",
+    icon: Dumbbell,
+  },
   {
     href: "/profile/settings",
     label: "Account Settings",

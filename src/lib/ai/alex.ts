@@ -341,6 +341,100 @@ Estimate the whole portion shown. If the photo isn't food, set calories to 0, co
   }
 }
 
+// ---------------------------------------------------------------------------
+// Coaching adjustments — proposals only, never applied as given
+// ---------------------------------------------------------------------------
+
+export type AdjustmentCandidate = {
+  exerciseId: string;
+  name: string;
+  recommendedWeight: number | null;
+  repRange: string;
+  lastSessions: string;
+  sessionsAtTopOfRange: number;
+  timesRemoved: number;
+};
+
+export type SuggestedAdjustment = {
+  exerciseId: string;
+  kind: "increase_weight" | "decrease_weight" | "swap_exercise";
+  percent?: number;
+  reason: string;
+};
+
+/**
+ * Asks Alex whether anything in today's session deserves a nudge.
+ *
+ * Everything returned is a *proposal*. src/lib/engine/adjustments.ts validates
+ * each one against the user's own logged data and hard bounds before any of it
+ * reaches the workout — an unjustified or oversized suggestion is dropped or
+ * clamped. This function returning nonsense cannot put a bad number on the bar.
+ */
+export async function suggestWorkoutAdjustments(
+  candidates: AdjustmentCandidate[]
+): Promise<SuggestedAdjustment[]> {
+  if (!client || candidates.length === 0) return [];
+  try {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 500,
+      system: ALEX_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: `Here is today's planned session. For each exercise you can see the weight the progression engine derived, the rep range, how recent sessions went, how many consecutive sessions hit the top of the range, and how often the user has removed the exercise.
+
+${candidates
+  .map(
+    (c) =>
+      `- id=${c.exerciseId} | ${c.name} | planned: ${c.recommendedWeight ?? "n/a"} lb x ${c.repRange} | recent: ${c.lastSessions || "no history"} | sessions at top of range: ${c.sessionsAtTopOfRange} | times removed: ${c.timesRemoved}`
+  )
+  .join("\n")}
+
+Suggest AT MOST 2 adjustments, and only where the data clearly supports one. Suggest nothing if nothing stands out — an empty list is the right answer most of the time.
+
+Rules:
+- increase_weight only when several consecutive sessions hit the top of the rep range.
+- decrease_weight when recent sessions look like a grind or reps fell short.
+- swap_exercise only when the user keeps removing that exercise.
+- percent must be between 1 and 10.
+
+Respond with ONLY a JSON array, no prose and no code fences:
+[{"exerciseId": "<id>", "kind": "increase_weight"|"decrease_weight"|"swap_exercise", "percent": <1-10, omit for swap>, "reason": "<one short sentence to show the user>"}]`,
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((block) => block.type === "text");
+    const raw = textBlock && "text" in textBlock ? textBlock.text.trim() : "";
+    if (!raw) return [];
+    const jsonText = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const parsed = JSON.parse(jsonText);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter(
+        (item): item is SuggestedAdjustment =>
+          typeof item?.exerciseId === "string" &&
+          (item.kind === "increase_weight" ||
+            item.kind === "decrease_weight" ||
+            item.kind === "swap_exercise")
+      )
+      .map((item) => ({
+        exerciseId: item.exerciseId,
+        kind: item.kind,
+        percent: typeof item.percent === "number" ? item.percent : undefined,
+        reason:
+          typeof item.reason === "string" && item.reason.trim()
+            ? item.reason.trim().slice(0, 160)
+            : "Adjusted based on your recent sessions.",
+      }));
+  } catch (error) {
+    console.error("Adjustment suggestion failed, continuing without one:", error);
+    return [];
+  }
+}
+
 export async function generateExerciseInstructions(facts: ExerciseInfoFacts): Promise<string> {
   const prompt = `Write brief step-by-step instructions (3-5 short steps) for how to correctly perform the exercise "${facts.name}"${
     facts.equipment ? ` using ${facts.equipment}` : ""
