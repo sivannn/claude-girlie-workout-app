@@ -9,7 +9,11 @@ import {
   type PlanCandidateExercise,
   type PlanPosition,
 } from "@/lib/engine/planGenerator";
-import { BLOCK_FOCUS_DESCRIPTION, BLOCK_FOCUS_LABEL } from "@/lib/engine/blockPrescriptions";
+import {
+  BLOCK_FOCUS_DESCRIPTION,
+  BLOCK_FOCUS_LABEL,
+  DELOAD_LOAD_MULTIPLIER,
+} from "@/lib/engine/blockPrescriptions";
 import { SPLIT_LABEL } from "@/lib/engine/weeklySplit";
 import type {
   BlockFocus,
@@ -325,6 +329,71 @@ function pickWorkoutTypeForDay(
   const wantsBack = muscleGroups.includes("back");
   const preferredColorKey = wantsLegs ? "glutes_legs" : wantsBack ? "back_biceps" : "chest_triceps";
   return types.find((t) => t.colorKey === preferredColorKey) ?? types[0];
+}
+
+export type TodaysPlanSession = {
+  planId: string;
+  dayLabel: string;
+  blockFocusLabel: string;
+  isDeloadWeek: boolean;
+  weekInBlock: number;
+  overrides: {
+    repRangeLow: number;
+    repRangeHigh: number;
+    workingSetCount: number;
+    loadMultiplier: number;
+  };
+  exerciseIds: string[];
+};
+
+/**
+ * The plan session scheduled for `asOf`, if the active plan has one that day.
+ *
+ * Returns null when there's no plan or today is a rest day — the caller then
+ * falls back to the per-session recommendation engine, so a user can always
+ * train off-plan without the app fighting them.
+ */
+export async function getTodaysPlanSession(
+  userId: string,
+  asOf = new Date()
+): Promise<TodaysPlanSession | null> {
+  const plan = await getActivePlan(userId, asOf);
+  if (!plan) return null;
+
+  // Which day of the plan week is today?
+  const dayDiff = Math.floor(
+    (Date.UTC(asOf.getFullYear(), asOf.getMonth(), asOf.getDate()) -
+      Date.UTC(plan.startedAt.getFullYear(), plan.startedAt.getMonth(), plan.startedAt.getDate())) /
+      (24 * 60 * 60 * 1000)
+  );
+  const offsetInWeek = ((dayDiff % 7) + 7) % 7;
+
+  const planDays = await prisma.planDay.findMany({
+    where: { block: { plan: { id: plan.id }, orderIndex: plan.currentBlock.orderIndex } },
+    include: { exercises: { orderBy: { orderIndex: "asc" } } },
+    orderBy: { dayIndex: "asc" },
+  });
+  const today = planDays.find((d) => d.dayOffset === offsetInWeek);
+  if (!today || today.exercises.length === 0) return null;
+
+  return {
+    planId: plan.id,
+    dayLabel: today.dayLabel,
+    blockFocusLabel: plan.currentBlock.focusLabel,
+    isDeloadWeek: plan.position.isDeloadWeek,
+    weekInBlock: plan.position.weekInBlock,
+    overrides: {
+      repRangeLow: plan.currentBlock.repRangeLow,
+      repRangeHigh: plan.currentBlock.repRangeHigh,
+      // The prescription is a range (e.g. 3-4 sets); take the lower bound on a
+      // deload week and the upper bound otherwise.
+      workingSetCount: plan.position.isDeloadWeek
+        ? plan.currentBlock.setsLow
+        : plan.currentBlock.setsHigh,
+      loadMultiplier: plan.position.isDeloadWeek ? DELOAD_LOAD_MULTIPLIER : 1,
+    },
+    exerciseIds: today.exercises.map((e) => e.exerciseId),
+  };
 }
 
 /** Drops the active plan without generating a replacement. */

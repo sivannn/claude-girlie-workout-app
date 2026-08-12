@@ -1,12 +1,14 @@
 "use server";
 
 import { getCurrentUser } from "@/lib/auth";
+import { getTodaysPlanSession } from "@/lib/data/plan-service";
 import { prisma } from "@/lib/prisma";
 import {
   decideCardioProgression,
   decideProgression,
   estimateStartingWeight,
   generateWeightliftingWorkout,
+  generatePlannedWorkout,
   rampWorkingSetWeights,
   trainingCategoryForWorkoutType,
 } from "@/lib/engine";
@@ -208,6 +210,69 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
         )
       );
     }
+  }
+
+  // When a block-periodization plan has a session scheduled for today, the
+  // plan supplies the exercises and the block's rep/set prescription (and
+  // scales the load on a deload week). Weights still come from logged history
+  // via decideProgression, so the plan never contradicts real lifting.
+  const planSession = await getTodaysPlanSession(user.id, new Date());
+  const planExerciseRows = planSession
+    ? await prisma.exercise.findMany({
+        where: { id: { in: planSession.exerciseIds }, userId: user.id },
+      })
+    : [];
+  const usePlan = planSession != null && planExerciseRows.length > 0;
+
+  if (usePlan) {
+    const orderedPlanExercises = planSession!.exerciseIds
+      .map((id) => planExerciseRows.find((e) => e.id === id))
+      .filter((e): e is (typeof planExerciseRows)[number] => e != null);
+    const planHistories = await getExerciseHistories(
+      user.id,
+      orderedPlanExercises.map((e) => e.id)
+    );
+    const planHints = new Map<string, number>();
+    for (const ex of orderedPlanExercises) {
+      if (!planHistories.get(ex.id)?.length) {
+        planHints.set(
+          ex.id,
+          estimateStartingWeight(
+            ex.movementCategory as MovementCategory,
+            user.preferences?.experienceLevel as ExperienceLevel | null | undefined,
+            user.preferences?.bodyWeightLb
+          )
+        );
+      }
+    }
+    const plannedWorkout = generatePlannedWorkout({
+      trainingCategory,
+      plannedExercises: orderedPlanExercises.map((e) => ({
+        exercise: e as EngineExercise,
+        movementCategory: e.movementCategory as MovementCategory,
+      })),
+      exerciseHistories: planHistories,
+      startingWeightHints: planHints,
+      asOfDate: new Date(),
+      overrides: planSession!.overrides,
+    });
+    const planGoals = await getLongTermGoals(
+      user.id,
+      orderedPlanExercises.map((e) => e.id)
+    );
+    const planViews = plannedWorkout.exercises.map((e) =>
+      toExerciseView(e, planHistories, planGoals)
+    );
+    const brief = await generateWorkoutBrief({
+      workoutTypeName: `${planSession!.dayLabel} (${planSession!.blockFocusLabel} block)`,
+      focus: planSession!.isDeloadWeek
+        ? `a recovery week — lighter loads at ${planSession!.overrides.repRangeLow}-${planSession!.overrides.repRangeHigh} reps so you start the next block fresh`
+        : `your ${planSession!.blockFocusLabel.toLowerCase()} block, week ${planSession!.weekInBlock} — ${planSession!.overrides.workingSetCount} sets of ${planSession!.overrides.repRangeLow}-${planSession!.overrides.repRangeHigh} reps`,
+      progressed: planViews.filter((e) => !e.isFirstTime && /adds|hit the top/.test(e.progressionReason)).map((e) => e.name),
+      held: planViews.filter((e) => !e.isFirstTime && /same weight/.test(e.progressionReason)).map((e) => e.name),
+      substitutions: [],
+    });
+    return { mode: "weightlifting", ...base, brief, exercises: planViews, abExercise: null };
   }
 
   const generated = generateWeightliftingWorkout({
