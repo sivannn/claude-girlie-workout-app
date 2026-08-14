@@ -78,7 +78,7 @@ export function ScheduleWorkoutDialog({ day }: { day: Date }) {
           Schedule workout
         </button>
       </DialogTrigger>
-      <DialogContent className="max-h-[70vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Schedule for {format(day, "EEEE, MMMM d")}</DialogTitle>
         </DialogHeader>
