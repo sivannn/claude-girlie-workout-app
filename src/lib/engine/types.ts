@@ -16,6 +16,12 @@ export type EngineExercise = {
   repRangeLow: number | null;
   repRangeHigh: number | null;
   defaultIncrementLb: number | null;
+  // "Each side" labeling flags — display-only, carried through so the view
+  // layer can label per-side weight/reps. Optional because engine-side test
+  // fixtures and planned-exercise literals don't set them; they come from the
+  // Exercise row at runtime. See src/lib/data/exercises.ts.
+  perSideWeight?: boolean;
+  perSideReps?: boolean;
 };
 
 export type EngineExercisePreference = {

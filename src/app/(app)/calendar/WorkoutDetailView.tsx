@@ -100,8 +100,18 @@ export function WorkoutDetailView({ workoutId }: { workoutId: string }) {
                       <thead>
                         <tr className="text-left text-muted-foreground">
                           <th className="py-0.5 pr-3 font-medium">Set</th>
-                          <th className="py-0.5 pr-3 font-medium">Weight</th>
-                          <th className="py-0.5 pr-3 font-medium">Reps</th>
+                          <th className="py-0.5 pr-3 font-medium">
+                            Weight
+                            {ex.perSideWeight ? (
+                              <span className="ml-1 font-normal text-muted-foreground/80">/ side</span>
+                            ) : null}
+                          </th>
+                          <th className="py-0.5 pr-3 font-medium">
+                            Reps
+                            {ex.perSideReps ? (
+                              <span className="ml-1 font-normal text-muted-foreground/80">/ side</span>
+                            ) : null}
+                          </th>
                           <th className="py-0.5 font-medium">Suggested</th>
                         </tr>
                       </thead>

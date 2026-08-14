@@ -36,6 +36,22 @@ export type ExerciseSeed = {
    * injured never get the exercise recommended.
    */
   contraindications: InjuryArea[];
+  /**
+   * The weight the user types is per-implement rather than a total, so it's
+   * labeled "each side": every dumbbell exercise (30 = 30 per dumbbell, even
+   * on two-dumbbell lifts), single-arm/single-leg cable or machine work, and
+   * two-handled cable movements (cable fly, cable chest press). A single
+   * implement held with both hands (goblet squat, one-DB pullover) is NOT
+   * per-side — its number already is the total. Display-only.
+   */
+  perSideWeight: boolean;
+  /**
+   * Reps are counted per side, so they're labeled "each side" — only for
+   * genuinely unilateral or alternating work (single-arm row, Bulgarian split
+   * squat, bicycle crunch). Two-dumbbell *simultaneous* work is not per-side
+   * reps even though its weight is per-side. Independent of perSideWeight.
+   */
+  perSideReps: boolean;
 };
 
 // Rep range bands from the Workout Playbook:
@@ -46,7 +62,10 @@ const MACHINE_COMPOUND = { repRangeLow: 8, repRangeHigh: 12 } as const;
 const ISOLATION = { repRangeLow: 10, repRangeHigh: 15 } as const;
 const HIGH_REP = { repRangeLow: 12, repRangeHigh: 20 } as const;
 
-export const EXERCISE_LIBRARY: ExerciseSeed[] = [
+// The library literal carries every field except the two "each side" flags,
+// which are applied below from name sets so the classification lives in one
+// readable, reviewable place instead of scattered across ~187 rows.
+const EXERCISE_LIBRARY_RAW: Omit<ExerciseSeed, "perSideWeight" | "perSideReps">[] = [
   // --- Glutes & Legs ---------------------------------------------------
   { name: "Barbell Squat", workoutCategory: "glutes_legs", movementCategory: "squat_lunge", kind: "STRENGTH", ...COMPOUND, defaultIncrementLb: 5, equipment: "barbell", muscleGroup: "legs", exerciseType: "compound", difficultyTier: "intermediate", contraindications: ["knee", "lower_back", "hip"] },
   { name: "Goblet Squat", workoutCategory: "glutes_legs", movementCategory: "squat_lunge", kind: "STRENGTH", ...MACHINE_COMPOUND, defaultIncrementLb: 5, equipment: "dumbbell", muscleGroup: "legs", exerciseType: "compound", difficultyTier: "beginner", contraindications: ["knee", "hip"] },
@@ -272,3 +291,73 @@ export const EXERCISE_LIBRARY: ExerciseSeed[] = [
   { name: "Box Step-Over", workoutCategory: "cardio", movementCategory: "other", kind: "CARDIO", repRangeLow: 12, repRangeHigh: 20, equipment: "bodyweight", muscleGroup: "legs", exerciseType: "accessory", difficultyTier: "beginner", contraindications: ["knee"] },
   { name: "Hill Sprints", workoutCategory: "cardio", movementCategory: "other", kind: "CARDIO", repRangeLow: 6, repRangeHigh: 10, equipment: "bodyweight", muscleGroup: "legs", exerciseType: "compound", difficultyTier: "advanced", contraindications: ["knee", "hip"] },
 ];
+
+// ---------------------------------------------------------------------------
+// "Each side" classification
+//
+// Two independent properties, kept as name sets so the whole classification is
+// reviewable in one place. Anything not listed is a bilateral/total movement
+// and gets both flags false. Equipment is a heuristic, not a rule — some
+// dumbbell lifts hold a single implement in both hands (goblet squat,
+// one-DB pullover), which is a total, not a per-side number.
+//
+// perSideWeight — the typed weight is per-implement, so it reads "each side":
+//   every dumbbell/hand (incl. two-DB presses), single-arm/single-leg cable
+//   or machine work, and two-handled cable fly/press.
+//
+// Spot-check candidates (judgment calls, noted in the PR):
+//   Overhead Triceps Extension  → weight FALSE (single DB, both hands overhead)
+//   Triceps Kickback            → reps FALSE (treated as bilateral)
+//   Cable Lateral Raise         → reps TRUE (single-arm at the stack)
+//   Landmine Press / Meadows Row→ single-arm landmine; weight FALSE (one loaded end), reps TRUE
+//   Spider Curl                 → reps FALSE (treated as both arms)
+//   B-Stance Hip Thrust         → weight FALSE (one DB on the hips), reps TRUE (staggered)
+//   Dead Bug / Bird Dog / Russian Twist / Windshield Wiper → reps TRUE (alternating)
+//   Plank Shoulder Tap / Flutter Kick → reps FALSE (counted as total taps/kicks)
+//   Pallof Press / Cable Woodchop → weight FALSE (single handle, both hands), reps TRUE (each side)
+//   Overhead Dumbbell Carry     → weight TRUE, reps FALSE (treated as one DB per hand)
+const PER_SIDE_WEIGHT_NAMES = new Set<string>([
+  // Two-dumbbell simultaneous — the number is one dumbbell
+  "Dumbbell Bench Press", "Incline Dumbbell Press", "Dumbbell Floor Press",
+  "Dumbbell Shoulder Press", "Arnold Press", "Dumbbell Romanian Deadlift",
+  "Incline Dumbbell Fly", "Flat Dumbbell Fly", "Lateral Raise", "Rear Delt Fly",
+  "Front Raise", "Triceps Kickback", "Dumbbell Curl", "Hammer Curl",
+  "Incline Dumbbell Curl", "Spider Curl", "Dumbbell Shrug", "Incline Dumbbell Row",
+  "Farmer's Carry", "Overhead Dumbbell Carry",
+  // Single-arm / single-leg dumbbell — number is the one implement you hold
+  "Walking Lunge", "Bulgarian Split Squat", "Step-Up", "Reverse Lunge",
+  "Curtsy Lunge", "Dumbbell Row", "Concentration Curl", "Suitcase Carry",
+  "Renegade Row", "Dumbbell Side Bend",
+  // Single-arm/single-leg + two-handled cable
+  "Cable Fly", "Low-to-High Cable Fly", "Cable Lateral Raise",
+  "Cable Glute Kickback", "Standing Cable Abduction", "Cable Adduction",
+  "Standing Cable Leg Curl", "Single-Arm Cable Pulldown", "Single-Arm Cable Row",
+]);
+
+// perSideReps — reps are counted per side: unilateral or alternating work only.
+// Two-dumbbell *simultaneous* lifts are NOT here even though their weight is
+// per-side.
+const PER_SIDE_REPS_NAMES = new Set<string>([
+  // Single-leg / unilateral lower body
+  "Walking Lunge", "Bulgarian Split Squat", "Reverse Lunge", "Curtsy Lunge",
+  "Step-Up", "Single-Leg Romanian Deadlift", "Single-Leg Hip Thrust",
+  "Single-Leg Squat to Bench", "Side-Lying Leg Raise", "B-Stance Hip Thrust",
+  "Clamshell", "Fire Hydrant", "Standing Banded Abduction", "Banded Glute Kickback",
+  "Pistol Squat", "Lateral Step-Down", "Cossack Squat", "Banded Standing Adduction",
+  "Single-Leg Calf Raise", "Cable Glute Kickback", "Standing Cable Abduction",
+  "Cable Adduction", "Standing Cable Leg Curl",
+  // Single-arm upper body
+  "Dumbbell Row", "Single-Arm Cable Pulldown", "Single-Arm Cable Row",
+  "Concentration Curl", "Meadows Row", "Cable Lateral Raise", "Landmine Press",
+  // Unilateral / alternating / rotational core
+  "Suitcase Carry", "Renegade Row", "Dumbbell Side Bend", "Bicycle Crunch",
+  "Dead Bug", "Bird Dog", "Side Plank", "Copenhagen Plank", "Pallof Press",
+  "Cable Woodchop", "Band Low-to-High Chop", "Landmine Rotation",
+  "Russian Twist", "Lying Windshield Wiper",
+]);
+
+export const EXERCISE_LIBRARY: ExerciseSeed[] = EXERCISE_LIBRARY_RAW.map((ex) => ({
+  ...ex,
+  perSideWeight: PER_SIDE_WEIGHT_NAMES.has(ex.name),
+  perSideReps: PER_SIDE_REPS_NAMES.has(ex.name),
+}));

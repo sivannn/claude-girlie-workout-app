@@ -212,6 +212,14 @@ model Exercise {
   exerciseType      String? // "compound" | "isolation" | "accessory"
   contraindications String? // JSON-encoded InjuryArea[] - joints this lift loads, matched against the user's flagged injuries
 
+  // Two independent "each side" labeling flags (see src/lib/data/exercises.ts).
+  // perSideWeight: the weight the user types is per-implement, not a total
+  // (every dumbbell/hand, single-arm or single-leg cable/machine, two-handled
+  // cable). perSideReps: reps are counted per side (unilateral/alternating
+  // work only). Display-only — they change no stored numbers or volume math.
+  perSideWeight     Boolean @default(false)
+  perSideReps       Boolean @default(false)
+
   workoutExercises WorkoutExercise[]
   goals            Goal[]
   preferences      ExercisePreference[]

@@ -128,8 +128,22 @@ export function ExerciseCard({
         <div className="grid grid-cols-[2rem_1fr_1fr_1fr_1.75rem] gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Set</span>
           <span>Recommended</span>
-          <span>Weight</span>
-          <span>Reps</span>
+          <span className="flex flex-col leading-tight">
+            Weight
+            {exercise.perSideWeight ? (
+              <span className="text-[9px] font-normal normal-case tracking-normal text-muted-foreground/80">
+                each side
+              </span>
+            ) : null}
+          </span>
+          <span className="flex flex-col leading-tight">
+            Reps
+            {exercise.perSideReps ? (
+              <span className="text-[9px] font-normal normal-case tracking-normal text-muted-foreground/80">
+                each side
+              </span>
+            ) : null}
+          </span>
           <span />
         </div>
 
