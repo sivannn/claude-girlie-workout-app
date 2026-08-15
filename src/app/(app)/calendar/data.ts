@@ -8,7 +8,8 @@ import {
   recommendNextWorkout,
   type NextWorkoutRecommendation,
 } from "@/lib/engine";
-import type { EngineWorkoutSummary, EngineWorkoutType } from "@/lib/engine/types";
+import type { EngineWorkoutType } from "@/lib/engine/types";
+import { getWorkoutSummaries } from "@/lib/data/workout-summaries";
 import type { EventStatus, WorkoutCategory } from "@/lib/types/enums";
 import { generateRecommendationReason } from "@/lib/ai/alex";
 import { cachedInsight } from "@/lib/ai/insight-cache";
@@ -33,30 +34,28 @@ function isSameDayUTC(a: Date, b: Date): boolean {
   );
 }
 
-async function computeRecommendation(userId: string): Promise<NextWorkoutRecommendation | null> {
-  const [workoutTypes, recentWorkouts, preferences] = await Promise.all([
-    prisma.workoutType.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
-    prisma.workout.findMany({ where: { userId }, include: { workoutType: true } }),
-    prisma.userPreferences.findUnique({ where: { userId } }),
+type CurrentUser = Awaited<ReturnType<typeof getCurrentUser>>;
+
+function weeklyTargetsOf(user: CurrentUser) {
+  return {
+    legDay: user.preferences?.weeklyLegDayTarget ?? 1,
+    upperBody: user.preferences?.weeklyUpperBodyTarget ?? 1,
+    cardio: user.preferences?.weeklyCardioTarget ?? 1,
+    fun: user.preferences?.weeklyFunTarget ?? 1,
+  };
+}
+
+async function computeRecommendation(user: CurrentUser): Promise<NextWorkoutRecommendation | null> {
+  // Preferences ride along on the request-cached user; the workout list is
+  // shared with the weekly checklist via getWorkoutSummaries.
+  const [workoutTypes, summaries] = await Promise.all([
+    prisma.workoutType.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }),
+    getWorkoutSummaries(user.id),
   ]);
-  const summaries: EngineWorkoutSummary[] = recentWorkouts.map((w) => ({
-    id: w.id,
-    date: w.date,
-    workoutTypeId: w.workoutTypeId,
-    category: w.workoutType.category as WorkoutCategory,
-    colorKey: w.workoutType.colorKey,
-    trainingCategory: null,
-    durationMinutes: w.durationMinutes,
-  }));
   return recommendNextWorkout(
     workoutTypes as EngineWorkoutType[],
     summaries,
-    {
-      legDay: preferences?.weeklyLegDayTarget ?? 1,
-      upperBody: preferences?.weeklyUpperBodyTarget ?? 1,
-      cardio: preferences?.weeklyCardioTarget ?? 1,
-      fun: preferences?.weeklyFunTarget ?? 1,
-    },
+    weeklyTargetsOf(user),
     new Date()
   );
 }
@@ -74,18 +73,16 @@ async function computeRecommendation(userId: string): Promise<NextWorkoutRecomme
 async function markOverdueAsMissed(userId: string) {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const overduePlanned = await prisma.workoutEvent.findMany({
+  // One statement: updateMany on an empty match is already a no-op, so the
+  // old find-then-update pair was a wasted round-trip.
+  await prisma.workoutEvent.updateMany({
     where: { userId, status: "PLANNED", scheduledDate: { lt: startOfToday } },
+    data: { status: "MISSED" },
   });
-  if (overduePlanned.length > 0) {
-    await prisma.workoutEvent.updateMany({
-      where: { id: { in: overduePlanned.map((e) => e.id) } },
-      data: { status: "MISSED" },
-    });
-  }
 }
 
-async function reconcileEvents(userId: string, recommendation: NextWorkoutRecommendation | null) {
+async function reconcileEvents(user: CurrentUser, recommendation: NextWorkoutRecommendation | null) {
+  const userId = user.id;
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -93,12 +90,10 @@ async function reconcileEvents(userId: string, recommendation: NextWorkoutRecomm
 
   // Once per day, not "whenever today looks empty" — otherwise removing or
   // rescheduling today's coach's pick would be silently undone on the next
-  // page load.
-  const preferences = await prisma.userPreferences.findUnique({
-    where: { userId },
-    select: { lastCoachPickDate: true },
-  });
-  if (preferences?.lastCoachPickDate && isSameDayUTC(preferences.lastCoachPickDate, now)) return;
+  // page load. lastCoachPickDate comes off the request-cached user; a stale
+  // read only matters across requests, and each request re-fetches the user.
+  const lastPick = user.preferences?.lastCoachPickDate;
+  if (lastPick && isSameDayUTC(lastPick, now)) return;
 
   const todaysEvents = await prisma.workoutEvent.findMany({
     where: { userId, scheduledDate: { gte: startOfToday } },
@@ -125,18 +120,34 @@ async function reconcileEvents(userId: string, recommendation: NextWorkoutRecomm
 
 export async function getCalendarMonthData(monthDate: Date) {
   const user = await getCurrentUser();
-  const recommendation = await computeRecommendation(user.id);
 
-  await markOverdueAsMissed(user.id);
+  // Stage 1 — independent reads (plus the overdue sweep, which no later step
+  // reads until stage 2's barrier): run them concurrently, since each await
+  // is a round-trip to the remote database in production.
+  const [recommendation, activePlan] = await Promise.all([
+    computeRecommendation(user),
+    getActivePlan(user.id),
+    markOverdueAsMissed(user.id),
+  ]);
 
-  // An active plan owns the schedule: its sessions go on the calendar and the
-  // single-day "coach's pick" reconciler stands down so the two don't fight.
-  const activePlan = await getActivePlan(user.id);
-  if (activePlan) {
-    await materializePlanWeek(user.id, activePlan);
-  } else {
-    await reconcileEvents(user.id, recommendation);
-  }
+  // Stage 2 — scheduling writes, which must be visible to the events query
+  // below. An active plan owns the schedule: its sessions go on the calendar
+  // and the single-day "coach's pick" reconciler stands down so the two don't
+  // fight. The insight lookup is independent of the writes, so it shares the
+  // stage.
+  const recommendationReasonPromise = recommendation
+    ? cachedInsight({
+        userId: user.id,
+        category: "home_reason",
+        facts: { kind: "reason", type: recommendation.workoutType.name, reason: recommendation.reason },
+        generate: () =>
+          generateRecommendationReason(recommendation.workoutType.name, recommendation.reason),
+      })
+    : Promise.resolve(null);
+  const [recommendationReason] = await Promise.all([
+    recommendationReasonPromise,
+    activePlan ? materializePlanWeek(user.id, activePlan) : reconcileEvents(user, recommendation),
+  ]);
 
   const gridStart = startOfWeek(startOfMonth(monthDate), { weekStartsOn: 1 });
   const gridEnd = endOfWeek(endOfMonth(monthDate), { weekStartsOn: 1 });
@@ -159,16 +170,6 @@ export async function getCalendarMonthData(monthDate: Date) {
     summary: e.workout?.aiRecapText ?? null,
     workoutId: e.workoutId,
   }));
-
-  const recommendationReason = recommendation
-    ? await cachedInsight({
-        userId: user.id,
-        category: "home_reason",
-        facts: { kind: "reason", type: recommendation.workoutType.name, reason: recommendation.reason },
-        generate: () =>
-          generateRecommendationReason(recommendation.workoutType.name, recommendation.reason),
-      })
-    : null;
 
   return {
     gridStart,
@@ -208,29 +209,10 @@ export async function getCurrentWeekEvents(): Promise<CalendarEvent[]> {
 
 export async function getWeeklyGoalChecklist(weekDate: Date) {
   const user = await getCurrentUser();
-  const workouts = await prisma.workout.findMany({
-    where: { userId: user.id },
-    include: { workoutType: true },
-  });
-  const summaries: EngineWorkoutSummary[] = workouts.map((w) => ({
-    id: w.id,
-    date: w.date,
-    workoutTypeId: w.workoutTypeId,
-    category: w.workoutType.category as WorkoutCategory,
-    colorKey: w.workoutType.colorKey,
-    trainingCategory: null,
-  }));
-  const preferences = await prisma.userPreferences.findUnique({ where: { userId: user.id } });
-  return getWeeklyGoalStatus(
-    summaries,
-    {
-      legDay: preferences?.weeklyLegDayTarget ?? 1,
-      upperBody: preferences?.weeklyUpperBodyTarget ?? 1,
-      cardio: preferences?.weeklyCardioTarget ?? 1,
-      fun: preferences?.weeklyFunTarget ?? 1,
-    },
-    weekDate
-  );
+  // Same request-cached workout list the recommendation engine reads, and
+  // targets straight off the user's already-loaded preferences.
+  const summaries = await getWorkoutSummaries(user.id);
+  return getWeeklyGoalStatus(summaries, weeklyTargetsOf(user), weekDate);
 }
 
 export type MonthlySummary = {

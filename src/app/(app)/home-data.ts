@@ -9,28 +9,12 @@ import {
   pickHomeInsightFact,
   recommendNextWorkout,
 } from "@/lib/engine";
-import type { EngineWorkoutSummary, EngineWorkoutType } from "@/lib/engine/types";
+import type { EngineWorkoutType } from "@/lib/engine/types";
+import { getWorkoutSummaries } from "@/lib/data/workout-summaries";
 import { generateHomeInsight, generateRecommendationReason } from "@/lib/ai/alex";
 import { cachedInsight } from "@/lib/ai/insight-cache";
 import { weeklyGoalBucketForWorkoutType, type WeeklyGoalBucket } from "@/lib/data/workout-types";
 import type { WorkoutCategory } from "@/lib/types/enums";
-
-async function getRecentWorkoutSummaries(userId: string): Promise<EngineWorkoutSummary[]> {
-  const workouts = await prisma.workout.findMany({
-    where: { userId },
-    include: { workoutType: true },
-    orderBy: { date: "desc" },
-  });
-  return workouts.map((w) => ({
-    id: w.id,
-    date: w.date,
-    workoutTypeId: w.workoutTypeId,
-    category: w.workoutType.category as WorkoutCategory,
-    colorKey: w.workoutType.colorKey,
-    trainingCategory: null,
-    durationMinutes: w.durationMinutes,
-  }));
-}
 
 async function getExerciseProgress(userId: string) {
   const sets = await prisma.workoutSet.findMany({
@@ -89,7 +73,7 @@ export async function getHomeData() {
 
   const [workoutTypes, recentWorkouts, recentAchievements, exerciseProgress, draftEvent] = await Promise.all([
     prisma.workoutType.findMany({ where: { userId: user.id }, orderBy: { createdAt: "asc" } }),
-    getRecentWorkoutSummaries(user.id),
+    getWorkoutSummaries(user.id),
     prisma.achievement.findMany({
       where: { userId: user.id },
       orderBy: { achievedAt: "desc" },
@@ -112,15 +96,6 @@ export async function getHomeData() {
     weeklyTargets,
     now
   );
-  const recommendationReason = recommendation
-    ? await cachedInsight({
-        userId: user.id,
-        category: "home_reason",
-        facts: { kind: "reason", type: recommendation.workoutType.name, reason: recommendation.reason },
-        generate: () =>
-          generateRecommendationReason(recommendation.workoutType.name, recommendation.reason),
-      })
-    : null;
   const recommendedBucket = recommendation
     ? weeklyGoalBucketForWorkoutType(
         recommendation.workoutType.category as WorkoutCategory,
@@ -152,18 +127,30 @@ export async function getHomeData() {
     monthlyTarget: monthlyStatus.target,
     totalWorkoutCount: recentWorkouts.length,
   });
-  const insightText = insightFact
-    ? await cachedInsight({
-        userId: user.id,
-        category: "home_insight",
-        facts: { kind: "insight", ...insightFact },
-        generate: () => generateHomeInsight(insightFact),
-      })
-    : null;
-
-  // While a plan is active it drives what the user sees; the stateless
-  // recommendation engine stays as the fallback for anyone without one.
-  const activePlan = await getActivePlan(user.id, now);
+  // The two insight lookups and the plan read are independent of each other,
+  // so they share one round of awaits instead of three serial ones. While a
+  // plan is active it drives what the user sees; the stateless recommendation
+  // engine stays as the fallback for anyone without one.
+  const [recommendationReason, insightText, activePlan] = await Promise.all([
+    recommendation
+      ? cachedInsight({
+          userId: user.id,
+          category: "home_reason",
+          facts: { kind: "reason", type: recommendation.workoutType.name, reason: recommendation.reason },
+          generate: () =>
+            generateRecommendationReason(recommendation.workoutType.name, recommendation.reason),
+        })
+      : Promise.resolve(null),
+    insightFact
+      ? cachedInsight({
+          userId: user.id,
+          category: "home_insight",
+          facts: { kind: "insight", ...insightFact },
+          generate: () => generateHomeInsight(insightFact),
+        })
+      : Promise.resolve(null),
+    getActivePlan(user.id, now),
+  ]);
 
   return {
     userName: user.name,

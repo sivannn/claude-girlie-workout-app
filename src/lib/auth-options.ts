@@ -29,6 +29,14 @@ export function buildAuthOptions(prisma: PrismaClient) {
     session: {
       expiresIn: SESSION_EXPIRES_IN_SECONDS,
       updateAge: SESSION_UPDATE_AGE_SECONDS,
+      // Serve the session from a short-lived signed cookie instead of hitting
+      // the database on every request — in production that lookup is a
+      // network round-trip to Turso before any page can render. Tradeoff: a
+      // revoked session stays usable for up to five minutes.
+      cookieCache: {
+        enabled: true,
+        maxAge: 5 * 60,
+      },
     },
     rateLimit: {
       // Default in-memory counters are per-serverless-instance (i.e. nearly

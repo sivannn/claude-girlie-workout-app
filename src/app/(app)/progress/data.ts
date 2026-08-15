@@ -29,7 +29,19 @@ export async function getProgressPageData() {
   };
   const monthlyTarget = preferences?.monthlyWorkoutTarget ?? 18;
 
-  const [allWorkouts, activeGoals, bodyWeightLogs, achievements, recentSets] = await Promise.all([
+  // Everything here is independent, so it's one concurrent batch rather than
+  // a string of serial round-trips to the remote database.
+  const [
+    allWorkouts,
+    activeGoals,
+    bodyWeightLogs,
+    achievements,
+    recentSets,
+    allTimeSets,
+    cardioBests,
+    mealDays,
+    burnedAgg,
+  ] = await Promise.all([
     prisma.workout.findMany({ where: { userId: user.id }, include: { workoutType: true } }),
     prisma.goal.findMany({ where: { userId: user.id, status: "ACTIVE" } }),
     prisma.bodyWeightLog.findMany({
@@ -51,6 +63,32 @@ export async function getProgressPageData() {
           select: { exerciseId: true, exercise: { select: { name: true } }, workout: { select: { date: true } } },
         },
       },
+    }),
+    // Personal records: current best per exercise, all-time (not windowed).
+    // The same scan also feeds the "Your Journey" stats ported from the
+    // removed History page (first-ever weight vs best-ever = most improved).
+    prisma.workoutSet.findMany({
+      where: { actualWeight: { not: null }, workoutExercise: { workout: { userId: user.id } } },
+      include: {
+        workoutExercise: {
+          select: { exerciseId: true, exercise: { select: { name: true } }, workout: { select: { date: true } } },
+        },
+      },
+    }),
+    prisma.workout.groupBy({
+      by: ["workoutTypeId"],
+      where: { userId: user.id, cardioDistanceMiles: { not: null } },
+      _max: { cardioDistanceMiles: true },
+    }),
+    // Calorie tracking over the same 100-day window as the other charts.
+    prisma.meal.groupBy({
+      by: ["date"],
+      where: { userId: user.id, date: { gte: windowStart } },
+      _sum: { calories: true },
+    }),
+    prisma.workout.aggregate({
+      where: { userId: user.id, date: { gte: windowStart }, caloriesBurned: { not: null } },
+      _sum: { caloriesBurned: true },
     }),
   ]);
 
@@ -100,17 +138,6 @@ export async function getProgressPageData() {
       ).sort((a, b) => a.date.localeCompare(b.date)),
     }));
 
-  // Personal records: current best per exercise, all-time (not windowed).
-  // The same scan also feeds the "Your Journey" stats ported from the removed
-  // History page (first-ever weight vs best-ever = most improved).
-  const allTimeSets = await prisma.workoutSet.findMany({
-    where: { actualWeight: { not: null }, workoutExercise: { workout: { userId: user.id } } },
-    include: {
-      workoutExercise: {
-        select: { exerciseId: true, exercise: { select: { name: true } }, workout: { select: { date: true } } },
-      },
-    },
-  });
   const personalRecords = new Map<string, { name: string; best: number }>();
   for (const s of allTimeSets) {
     const id = s.workoutExercise.exerciseId;
@@ -149,14 +176,6 @@ export async function getProgressPageData() {
     [...firstAndBest.values()]
       .map((e) => ({ name: e.name, delta: Math.round((e.best - e.first) * 10) / 10 }))
       .sort((a, b) => b.delta - a.delta)[0] ?? null;
-  const cardioBests = await prisma.workout.groupBy({
-    by: ["workoutTypeId"],
-    where: { userId: user.id, cardioDistanceMiles: { not: null } },
-    _max: { cardioDistanceMiles: true },
-  });
-  const cardioTypes = await prisma.workoutType.findMany({
-    where: { id: { in: cardioBests.map((c) => c.workoutTypeId) } },
-  });
 
   // Workout balance over the window, by workout-type subtype.
   const windowWorkouts = allWorkouts.filter((w) => w.date >= windowStart);
@@ -189,27 +208,20 @@ export async function getProgressPageData() {
     monthlyTarget: monthly.target,
     totalWorkoutCount: allWorkouts.length,
   });
-  const overviewInsight = insightFact
-    ? await cachedInsight({
-        userId: user.id,
-        category: "progress_overview",
-        facts: insightFact,
-        generate: () => generateHomeInsight(insightFact),
-      })
-    : null;
-
-  // Calorie tracking over the same 100-day window as the other charts.
-  const [mealDays, burnedAgg] = await Promise.all([
-    prisma.meal.groupBy({
-      by: ["date"],
-      where: { userId: user.id, date: { gte: windowStart } },
-      _sum: { calories: true },
-    }),
-    prisma.workout.aggregate({
-      where: { userId: user.id, date: { gte: windowStart }, caloriesBurned: { not: null } },
-      _sum: { caloriesBurned: true },
+  const [overviewInsight, cardioTypes] = await Promise.all([
+    insightFact
+      ? cachedInsight({
+          userId: user.id,
+          category: "progress_overview",
+          facts: insightFact,
+          generate: () => generateHomeInsight(insightFact),
+        })
+      : Promise.resolve(null),
+    prisma.workoutType.findMany({
+      where: { id: { in: cardioBests.map((c) => c.workoutTypeId) } },
     }),
   ]);
+
   const dailyTarget = preferences?.dailyCalorieTarget ?? null;
   const loggedDays = mealDays.length;
   const totalConsumed = mealDays.reduce((sum, d) => sum + (d._sum.calories ?? 0), 0);

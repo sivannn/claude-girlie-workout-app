@@ -9,7 +9,16 @@ import { AlexNote } from "@/components/shared/AlexNote";
 import { CalendarActions } from "./CalendarActions";
 import { MonthGrid } from "./MonthGrid";
 import { WeekView } from "./WeekView";
-import { MonthlySummaryChart } from "./MonthlySummaryChart";
+import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// recharts only serves this one summary card; deferring it past hydration
+// takes the library out of the calendar's initial bundle. The skeleton holds
+// the card's space so the tab doesn't jump when the chunk arrives.
+const MonthlySummaryChart = dynamic(
+  () => import("./MonthlySummaryChart").then((m) => m.MonthlySummaryChart),
+  { ssr: false, loading: () => <Skeleton className="h-80 w-full rounded-xl" /> }
+);
 import type { CalendarEvent, MonthlySummary } from "./data";
 import type { WeeklyGoalBucket } from "@/lib/data/workout-types";
 
