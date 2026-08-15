@@ -24,10 +24,13 @@ export type CardioResult = {
 
 export function CardioSessionForm({
   session,
+  backdated = false,
   onFinish,
   finishing,
 }: {
   session: CardioSessionData;
+  /** Logging a previous session: the time field doubles as the duration, so it's required. */
+  backdated?: boolean;
   onFinish: (result: CardioResult) => void;
   finishing: boolean;
 }) {
@@ -36,6 +39,8 @@ export function CardioSessionForm({
   const [seconds, setSeconds] = useState("");
   const [distance, setDistance] = useState("");
   const router = useRouter();
+
+  const missingRequiredTime = backdated && !minutes && !seconds;
 
   const submit = () => {
     const totalSeconds =
@@ -51,7 +56,7 @@ export function CardioSessionForm({
     <div className="flex flex-col gap-5">
       <CategoryBadge colorKey={session.colorKey} label={session.workoutTypeName} />
 
-      <AlexNote title="Today's target">
+      <AlexNote title={backdated ? "That day's target" : "Today's target"}>
         {session.reason}
         {session.recommendedDistanceMiles != null ? ` Target distance: ${session.recommendedDistanceMiles} mi.` : ""}
         {session.recommendedTimeSeconds != null
@@ -73,7 +78,7 @@ export function CardioSessionForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label>Time</Label>
+        <Label>{backdated ? "Time (required)" : "Time"}</Label>
         <div className="flex items-center gap-2">
           <Input
             type="number"
@@ -104,11 +109,21 @@ export function CardioSessionForm({
       </div>
 
       <div className="flex gap-2">
-        <Button variant="outline" className="flex-1" disabled={finishing} onClick={() => router.push("/")}>
+        <Button
+          variant="outline"
+          className="flex-1"
+          disabled={finishing}
+          onClick={() => router.push(backdated ? "/calendar" : "/")}
+        >
           Exit
         </Button>
-        <Button size="lg" className="flex-[2]" disabled={finishing} onClick={submit}>
-          {finishing ? "Saving…" : "Finish Workout"}
+        <Button
+          size="lg"
+          className="flex-[2]"
+          disabled={finishing || missingRequiredTime}
+          onClick={submit}
+        >
+          {finishing ? "Saving…" : backdated ? "Log Workout" : "Finish Workout"}
         </Button>
       </div>
     </div>

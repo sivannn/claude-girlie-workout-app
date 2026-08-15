@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlexNote } from "@/components/shared/AlexNote";
+import { CalendarActions } from "./CalendarActions";
 import { MonthGrid } from "./MonthGrid";
 import { WeekView } from "./WeekView";
 import { MonthlySummaryChart } from "./MonthlySummaryChart";
@@ -48,6 +49,8 @@ export function CalendarClient({
   return (
     <div className="flex flex-col gap-6">
       {recommendationReason ? <AlexNote title="Coach's Pick">{recommendationReason}</AlexNote> : null}
+
+      <CalendarActions />
 
       <Tabs defaultValue="monthly">
         <TabsList className="w-full">

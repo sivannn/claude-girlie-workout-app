@@ -97,10 +97,20 @@ export type CompleteSimplePayload = {
   notes: string | null;
 };
 
-export type CompleteWorkoutPayload =
+/** Present when logging a previous workout from the calendar instead of a live session. */
+export type BackdateFields = {
+  /** The day being logged for ("yyyy-MM-dd"); range-validated server-side. */
+  targetDate?: string | null;
+  /** The browser's local today, so a UTC server agrees with the picker's range. */
+  clientToday?: string;
+};
+
+export type CompleteWorkoutPayload = (
   | CompleteWeightliftingPayload
   | CompleteCardioPayload
-  | CompleteSimplePayload;
+  | CompleteSimplePayload
+) &
+  BackdateFields;
 
 export type WorkoutRecapResult = {
   recap: string;
