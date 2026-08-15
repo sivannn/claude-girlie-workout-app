@@ -7,7 +7,6 @@ import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import type { CalendarEvent } from "./data";
 import { RemoveEventButton } from "./RemoveEventButton";
 import { RescheduleDialog } from "./RescheduleDialog";
-import { ScheduleWorkoutDialog } from "./ScheduleWorkoutDialog";
 import { WorkoutDetailView } from "./WorkoutDetailView";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -40,6 +39,11 @@ export function DayEventsSheet({
               <CalendarPlus className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
               <p className="text-sm text-muted-foreground">
                 {isPastDay ? "Nothing happened on this day." : "Nothing planned yet."}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {isPastDay
+                  ? "Use “Log previous workout” above the calendar to record one."
+                  : "Use the buttons above the calendar to start or schedule a workout."}
               </p>
             </div>
           ) : null}
@@ -84,9 +88,6 @@ export function DayEventsSheet({
               ) : null}
             </div>
           ))}
-
-          {/* Green plus = plan for later; the red plus in the nav stays "work out now". */}
-          {day ? <ScheduleWorkoutDialog day={day} /> : null}
         </div>
       </SheetContent>
     </Sheet>

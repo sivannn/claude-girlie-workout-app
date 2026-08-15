@@ -23,6 +23,8 @@ import type {
   EngineWorkoutType,
 } from "@/lib/engine/types";
 import { movementCategoryLabel } from "@/lib/data/movement-labels";
+import { recordCompletedEvent, resolveBackdate } from "@/lib/data/workout-logging";
+import { parseLocalDateInput } from "@/lib/utils/date";
 import { weeklyGoalBucketForWorkoutType } from "@/lib/data/workout-types";
 import { filterExercisesByEquipment } from "@/lib/data/equipment";
 import type { EquipmentAccess, ExperienceLevel, MovementCategory, WorkoutCategory } from "@/lib/types/enums";
@@ -70,12 +72,14 @@ async function estimateBurnedFor(
 
 async function getExerciseHistories(
   userId: string,
-  exerciseIds: string[]
+  exerciseIds: string[],
+  /** When set (logging a past workout), only history up to that moment counts. */
+  until?: Date
 ): Promise<Map<string, EngineExerciseSession[]>> {
   if (exerciseIds.length === 0) return new Map();
 
   const workoutExercises = await prisma.workoutExercise.findMany({
-    where: { exerciseId: { in: exerciseIds }, workout: { userId } },
+    where: { exerciseId: { in: exerciseIds }, workout: { userId, ...(until ? { date: { lte: until } } : {}) } },
     include: { sets: true, workout: { select: { date: true } } },
     orderBy: { workout: { date: "desc" } },
   });
@@ -108,9 +112,9 @@ function formatSessionSummary(session: EngineExerciseSession | undefined): strin
   return parts.length ? parts.join(", ") : null;
 }
 
-async function getRecentPicks(userId: string, workoutTypeId: string, limit = 4) {
+async function getRecentPicks(userId: string, workoutTypeId: string, limit = 4, until?: Date) {
   const recentWorkouts = await prisma.workout.findMany({
-    where: { userId, workoutTypeId },
+    where: { userId, workoutTypeId, ...(until ? { date: { lte: until } } : {}) },
     orderBy: { date: "desc" },
     take: limit,
     include: { exercises: true },
@@ -172,11 +176,24 @@ function toExerciseView(
   };
 }
 
-export async function generateWorkoutForType(workoutTypeId: string): Promise<GeneratedSessionData> {
+export async function generateWorkoutForType(
+  workoutTypeId: string,
+  /** Set when logging a previous workout: recommendations are computed as of that day. */
+  targetDate?: string | null
+): Promise<GeneratedSessionData> {
   const user = await getCurrentUser();
   const workoutType = await prisma.workoutType.findFirstOrThrow({
     where: { id: workoutTypeId, userId: user.id },
   });
+
+  // For a backdated session, progression/deload logic runs as of the target
+  // day and only sees history up to it — a workout logged since then
+  // shouldn't influence what was recommended "back then".
+  const targetDay = targetDate ? parseLocalDateInput(targetDate) : null;
+  const asOf = targetDay
+    ? new Date(targetDay.getFullYear(), targetDay.getMonth(), targetDay.getDate(), 23, 59, 59, 999)
+    : new Date();
+  const until = targetDay ? asOf : undefined;
 
   const base = {
     workoutTypeId: workoutType.id,
@@ -190,7 +207,7 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
 
   if (workoutType.category === "CARDIO") {
     const recentWorkouts = await prisma.workout.findMany({
-      where: { userId: user.id, workoutTypeId: workoutType.id },
+      where: { userId: user.id, workoutTypeId: workoutType.id, ...(until ? { date: { lte: until } } : {}) },
       orderBy: { date: "desc" },
       take: RECENT_SESSIONS_LIMIT,
     });
@@ -220,7 +237,7 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
     prisma.exercise.findMany({ where: { userId: user.id, workoutCategory: trainingCategory } }),
     prisma.exercise.findMany({ where: { userId: user.id, workoutCategory: "abs" } }),
     prisma.exercisePreference.findMany({ where: { userId: user.id } }),
-    getRecentPicks(user.id, workoutType.id),
+    getRecentPicks(user.id, workoutType.id, 4, until),
   ]);
   // Ab picks share the same recent workouts of this type.
   const recentAbPicks = recentPicks;
@@ -231,7 +248,7 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
 
   const allExerciseIds = [...liftingExercises, ...abExercises].map((e) => e.id);
   const [histories, goals] = await Promise.all([
-    getExerciseHistories(user.id, allExerciseIds),
+    getExerciseHistories(user.id, allExerciseIds, until),
     getLongTermGoals(user.id, allExerciseIds),
   ]);
 
@@ -261,7 +278,7 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
   // plan supplies the exercises and the block's rep/set prescription (and
   // scales the load on a deload week). Weights still come from logged history
   // via decideProgression, so the plan never contradicts real lifting.
-  const planSession = await getTodaysPlanSession(user.id, new Date());
+  const planSession = await getTodaysPlanSession(user.id, targetDay ?? new Date());
   const planExerciseRows = planSession
     ? await prisma.exercise.findMany({
         where: { id: { in: planSession.exerciseIds }, userId: user.id },
@@ -275,7 +292,8 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
       .filter((e): e is (typeof planExerciseRows)[number] => e != null);
     const planHistories = await getExerciseHistories(
       user.id,
-      orderedPlanExercises.map((e) => e.id)
+      orderedPlanExercises.map((e) => e.id),
+      until
     );
     const planHints = new Map<string, number>();
     for (const ex of orderedPlanExercises) {
@@ -298,7 +316,7 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
       })),
       exerciseHistories: planHistories,
       startingWeightHints: planHints,
-      asOfDate: new Date(),
+      asOfDate: asOf,
       overrides: planSession!.overrides,
     });
     const planGoals = await getLongTermGoals(
@@ -329,7 +347,7 @@ export async function generateWorkoutForType(workoutTypeId: string): Promise<Gen
     recentAbPicks,
     exerciseHistories: histories,
     startingWeightHints,
-    asOfDate: new Date(),
+    asOfDate: asOf,
   });
 
   const exercises = generated.exercises.map((e) => toExerciseView(e, histories, goals));
@@ -623,43 +641,19 @@ export async function completeWorkout(
   const workoutType = await prisma.workoutType.findFirstOrThrow({
     where: { id: payload.workoutTypeId, userId: user.id },
   });
-  const now = new Date();
+  // A backdated log gets the target day as its date (range-enforced here, on
+  // the server); a live session gets the real current moment.
+  const workoutDate = payload.targetDate
+    ? resolveBackdate(payload.targetDate, payload.clientToday)
+    : new Date();
 
   if (payload.mode === "weightlifting") {
-    return completeWeightliftingWorkout(user.id, workoutType.id, workoutType.name, payload, now);
+    return completeWeightliftingWorkout(user.id, workoutType.id, workoutType.name, payload, workoutDate);
   }
   if (payload.mode === "cardio") {
-    return completeCardioWorkout(user.id, workoutType.id, workoutType.name, payload, now);
+    return completeCardioWorkout(user.id, workoutType.id, workoutType.name, payload, workoutDate);
   }
-  return completeSimpleWorkout(user.id, workoutType.id, workoutType.name, payload, now);
-}
-
-async function createCompletedEvent(
-  userId: string,
-  workoutTypeId: string,
-  workoutId: string,
-  date: Date,
-  draftEventId?: string | null
-) {
-  if (draftEventId) {
-    // Convert the in-progress draft event into the completed one, rather than
-    // leaving a stale IN_PROGRESS row behind alongside a new COMPLETED one.
-    await prisma.workoutEvent.update({
-      where: { id: draftEventId, userId },
-      data: { workoutTypeId, workoutId, scheduledDate: date, status: "COMPLETED", draftDataJson: null },
-    });
-    return;
-  }
-  await prisma.workoutEvent.create({
-    data: {
-      userId,
-      workoutTypeId,
-      workoutId,
-      scheduledDate: date,
-      status: "COMPLETED",
-      createdBy: "USER",
-    },
-  });
+  return completeSimpleWorkout(user.id, workoutType.id, workoutType.name, payload, workoutDate);
 }
 
 async function completeWeightliftingWorkout(
@@ -667,7 +661,7 @@ async function completeWeightliftingWorkout(
   workoutTypeId: string,
   workoutTypeName: string,
   payload: Extract<CompleteWorkoutPayload, { mode: "weightlifting" }>,
-  now: Date
+  workoutDate: Date
 ): Promise<WorkoutRecapResult> {
   const exerciseIds = payload.exercises.map((e) => e.exerciseId);
   const [priorBests, histories, exerciseRows, user] = await Promise.all([
@@ -687,7 +681,7 @@ async function completeWeightliftingWorkout(
     data: {
       userId,
       workoutTypeId,
-      date: now,
+      date: workoutDate,
       durationMinutes: payload.durationMinutes,
       ...(await estimateBurnedFor(userId, workoutTypeId, payload.durationMinutes)),
       exercises: {
@@ -719,7 +713,13 @@ async function completeWeightliftingWorkout(
     },
   });
 
-  await createCompletedEvent(userId, workoutTypeId, workout.id, now, payload.draftEventId);
+  await recordCompletedEvent(prisma, {
+    userId,
+    workoutTypeId,
+    workoutId: workout.id,
+    date: workoutDate,
+    draftEventId: payload.draftEventId,
+  });
 
   // Learning signal: bump selection counts for exercises actually kept in this workout.
   await Promise.all(
@@ -777,10 +777,10 @@ async function completeWeightliftingWorkout(
           description: `New heaviest working weight for ${name}.`,
           relatedExerciseId: e.exerciseId,
           relatedWorkoutId: workout.id,
-          achievedAt: now,
+          achievedAt: workoutDate,
         },
       });
-      await applyGoalProgress(userId, e.exerciseId, sessionBest, now, workout.id);
+      await applyGoalProgress(userId, e.exerciseId, sessionBest, workoutDate, workout.id);
     } else {
       const lastSession = histories.get(e.exerciseId)?.[0];
       const lastBest = lastSession
@@ -873,7 +873,7 @@ async function completeCardioWorkout(
   workoutTypeId: string,
   workoutTypeName: string,
   payload: Extract<CompleteWorkoutPayload, { mode: "cardio" }>,
-  now: Date
+  workoutDate: Date
 ): Promise<WorkoutRecapResult> {
   const priorBestDistance = await prisma.workout.aggregate({
     where: { userId, workoutTypeId, cardioDistanceMiles: { not: null } },
@@ -884,7 +884,7 @@ async function completeCardioWorkout(
     data: {
       userId,
       workoutTypeId,
-      date: now,
+      date: workoutDate,
       durationMinutes: payload.durationMinutes,
       ...(await estimateBurnedFor(userId, workoutTypeId, payload.durationMinutes)),
       cardioIndoorOutdoor: payload.indoorOutdoor,
@@ -892,7 +892,7 @@ async function completeCardioWorkout(
       cardioDistanceMiles: payload.distanceMiles,
     },
   });
-  await createCompletedEvent(userId, workoutTypeId, workout.id, now);
+  await recordCompletedEvent(prisma, { userId, workoutTypeId, workoutId: workout.id, date: workoutDate });
 
   const prsAchieved: string[] = [];
   const bestSoFar = priorBestDistance._max.cardioDistanceMiles ?? 0;
@@ -904,7 +904,7 @@ async function completeCardioWorkout(
         type: "PR",
         title: `${workoutTypeName} PR: ${payload.distanceMiles} mi`,
         relatedWorkoutId: workout.id,
-        achievedAt: now,
+        achievedAt: workoutDate,
       },
     });
   }
@@ -926,19 +926,19 @@ async function completeSimpleWorkout(
   workoutTypeId: string,
   workoutTypeName: string,
   payload: Extract<CompleteWorkoutPayload, { mode: "simple" }>,
-  now: Date
+  workoutDate: Date
 ): Promise<WorkoutRecapResult> {
   const workout = await prisma.workout.create({
     data: {
       userId,
       workoutTypeId,
-      date: now,
+      date: workoutDate,
       durationMinutes: payload.durationMinutes,
       ...(await estimateBurnedFor(userId, workoutTypeId, payload.durationMinutes)),
       notes: payload.notes,
     },
   });
-  await createCompletedEvent(userId, workoutTypeId, workout.id, now);
+  await recordCompletedEvent(prisma, { userId, workoutTypeId, workoutId: workout.id, date: workoutDate });
 
   const recap = await generateWorkoutRecap({
     workoutTypeName,
