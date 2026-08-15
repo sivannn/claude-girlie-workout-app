@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { parseLocalDateInput } from "@/lib/utils/date";
 import type { WorkoutCategory } from "@/lib/types/enums";
 import { WorkoutTypeSelector, type WorkoutTypeOption, type PickerGroup } from "./WorkoutTypeSelector";
 import { WorkoutCategoryPicker } from "./WorkoutCategoryPicker";
@@ -25,11 +27,14 @@ export function StartWorkoutFlow({
   initialTypeId,
   initialResumeId,
   initialCategory,
+  targetDate = null,
 }: {
   workoutTypes: WorkoutTypeOption[];
   initialTypeId: string | null;
   initialResumeId: string | null;
   initialCategory: PickerGroup | null;
+  /** When set ("yyyy-MM-dd"), the whole flow logs a previous workout for that day instead of a live session. */
+  targetDate?: string | null;
 }) {
   const [phase, setPhase] = useState<Phase>(initialTypeId || initialResumeId ? "loading" : "select");
   const [session, setSession] = useState<GeneratedSessionData | null>(null);
@@ -42,13 +47,16 @@ export function StartWorkoutFlow({
   const startedAt = useRef<number>(0);
   const initialized = useRef(false);
 
-  const selectType = useCallback(async (typeId: string) => {
-    setPhase("loading");
-    startedAt.current = Date.now();
-    const data = await generateWorkoutForType(typeId);
-    setSession(data);
-    setPhase("session");
-  }, []);
+  const selectType = useCallback(
+    async (typeId: string) => {
+      setPhase("loading");
+      startedAt.current = Date.now();
+      const data = await generateWorkoutForType(typeId, targetDate);
+      setSession(data);
+      setPhase("session");
+    },
+    [targetDate]
+  );
 
   const resumeDraft = useCallback(async (eventId: string) => {
     setPhase("loading");
@@ -73,11 +81,12 @@ export function StartWorkoutFlow({
   }, []);
 
   useEffect(() => {
-    if (initialResumeId && !initialized.current) {
+    // Drafts are a live-session affordance; a backdated log never resumes one.
+    if (initialResumeId && !targetDate && !initialized.current) {
       initialized.current = true;
       void resumeDraft(initialResumeId);
     }
-  }, [initialResumeId, resumeDraft]);
+  }, [initialResumeId, targetDate, resumeDraft]);
 
   useEffect(() => {
     if (initialTypeId && !initialized.current) {
@@ -93,9 +102,16 @@ export function StartWorkoutFlow({
 
   const elapsedMinutes = () => Math.max(1, Math.round((Date.now() - startedAt.current) / 60000));
 
+  // Backdated logs send the target day plus the browser's today, so a UTC
+  // server enforces the one-month window against the user's clock, not its own.
+  const backdateFields = targetDate
+    ? { targetDate, clientToday: format(new Date(), "yyyy-MM-dd") }
+    : {};
+
   const handleFinishWeightlifting = async (
     exercises: EditableExercise[],
-    removedExerciseIds: string[]
+    removedExerciseIds: string[],
+    manualDurationMinutes: number | null
   ) => {
     if (!session || session.mode !== "weightlifting") return;
     setPhase("finishing");
@@ -103,9 +119,10 @@ export function StartWorkoutFlow({
       const result = await completeWorkout({
         mode: "weightlifting",
         workoutTypeId: session.workoutTypeId,
-        durationMinutes: elapsedMinutes(),
+        durationMinutes: targetDate ? (manualDurationMinutes ?? 1) : elapsedMinutes(),
         removedExerciseIds,
         draftEventId,
+        ...backdateFields,
         exercises: exercises.map((e) => ({
           exerciseId: e.exerciseId,
           movementCategory: e.movementCategory,
@@ -135,8 +152,13 @@ export function StartWorkoutFlow({
       const outcome = await completeWorkout({
         mode: "cardio",
         workoutTypeId: session.workoutTypeId,
-        durationMinutes: elapsedMinutes(),
+        // A backdated cardio log takes its duration from the entered time
+        // (required in that mode) — the elapsed form-filling time means nothing.
+        durationMinutes: targetDate
+          ? Math.max(1, Math.round((result.timeSeconds ?? 60) / 60))
+          : elapsedMinutes(),
         ...result,
+        ...backdateFields,
       });
       setRecap({ text: outcome.recap, prs: outcome.prsAchieved });
       setPhase("recap");
@@ -148,15 +170,19 @@ export function StartWorkoutFlow({
     }
   };
 
-  const handleFinishSimple = async (result: { notes: string | null }) => {
+  const handleFinishSimple = async (result: {
+    notes: string | null;
+    durationMinutes: number | null;
+  }) => {
     if (!session || session.mode !== "simple") return;
     setPhase("finishing");
     try {
       const outcome = await completeWorkout({
         mode: "simple",
         workoutTypeId: session.workoutTypeId,
-        durationMinutes: elapsedMinutes(),
+        durationMinutes: targetDate ? (result.durationMinutes ?? 1) : elapsedMinutes(),
         notes: result.notes,
+        ...backdateFields,
       });
       setRecap({ text: outcome.recap, prs: outcome.prsAchieved });
       setPhase("recap");
@@ -194,12 +220,15 @@ export function StartWorkoutFlow({
     );
   }
 
+  const targetDateLabel = targetDate ? format(parseLocalDateInput(targetDate), "EEEE, MMMM d") : null;
+
   if (phase === "recap" && recap) {
     return (
       <RecapScreen
         workoutTypeName={session?.workoutTypeName ?? "Workout"}
         recap={recap.text}
         prsAchieved={recap.prs}
+        loggedForLabel={targetDateLabel}
       />
     );
   }
@@ -219,9 +248,18 @@ export function StartWorkoutFlow({
     </p>
   ) : null;
 
+  // Constant reminder that this session isn't "now" — everything entered
+  // below lands on the chosen past day.
+  const backdateBanner = targetDateLabel ? (
+    <p className="mb-4 rounded-md bg-secondary px-3 py-2 text-sm font-medium text-foreground">
+      Logging a previous workout for {targetDateLabel}
+    </p>
+  ) : null;
+
   if (session.mode === "weightlifting") {
     return (
       <>
+        {backdateBanner}
         {finishBanner}
         <WeightliftingSession
           session={session}
@@ -229,6 +267,7 @@ export function StartWorkoutFlow({
           initialAbExercise={draft?.abExercise}
           initialRemovedIds={draft?.removedExerciseIds}
           draftEventId={draftEventId}
+          backdated={targetDate != null}
           onFinish={handleFinishWeightlifting}
           finishing={finishing}
         />
@@ -238,15 +277,27 @@ export function StartWorkoutFlow({
   if (session.mode === "cardio") {
     return (
       <>
+        {backdateBanner}
         {finishBanner}
-        <CardioSessionForm session={session} onFinish={handleFinishCardio} finishing={finishing} />
+        <CardioSessionForm
+          session={session}
+          backdated={targetDate != null}
+          onFinish={handleFinishCardio}
+          finishing={finishing}
+        />
       </>
     );
   }
   return (
     <>
+      {backdateBanner}
       {finishBanner}
-      <SimpleSessionForm session={session} onFinish={handleFinishSimple} finishing={finishing} />
+      <SimpleSessionForm
+        session={session}
+        backdated={targetDate != null}
+        onFinish={handleFinishSimple}
+        finishing={finishing}
+      />
     </>
   );
 }

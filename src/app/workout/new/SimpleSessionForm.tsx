@@ -3,21 +3,27 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
+import { parseNumberInput } from "./sessionState";
 import type { SimpleSessionData } from "./types";
 
 export function SimpleSessionForm({
   session,
+  backdated = false,
   onFinish,
   finishing,
 }: {
   session: SimpleSessionData;
-  onFinish: (result: { notes: string | null }) => void;
+  /** Logging a previous session: duration is asked for instead of timed. */
+  backdated?: boolean;
+  onFinish: (result: { notes: string | null; durationMinutes: number | null }) => void;
   finishing: boolean;
 }) {
   const [notes, setNotes] = useState("");
+  const [duration, setDuration] = useState("");
   const router = useRouter();
 
   return (
@@ -37,17 +43,40 @@ export function SimpleSessionForm({
         />
       </div>
 
+      {backdated ? (
+        <div className="space-y-1.5">
+          <Label>How long was it? (minutes)</Label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            placeholder="e.g. 45"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+          />
+        </div>
+      ) : null}
+
       <div className="flex gap-2">
-        <Button variant="outline" className="flex-1" disabled={finishing} onClick={() => router.push("/")}>
+        <Button
+          variant="outline"
+          className="flex-1"
+          disabled={finishing}
+          onClick={() => router.push(backdated ? "/calendar" : "/")}
+        >
           Exit
         </Button>
         <Button
           size="lg"
           className="flex-[2]"
-          disabled={finishing}
-          onClick={() => onFinish({ notes: notes.trim() || null })}
+          disabled={finishing || (backdated && !((parseNumberInput(duration) ?? 0) > 0))}
+          onClick={() =>
+            onFinish({
+              notes: notes.trim() || null,
+              durationMinutes: backdated ? parseNumberInput(duration) : null,
+            })
+          }
         >
-          {finishing ? "Saving…" : "Finish Workout"}
+          {finishing ? "Saving…" : backdated ? "Log Workout" : "Finish Workout"}
         </Button>
       </div>
     </div>

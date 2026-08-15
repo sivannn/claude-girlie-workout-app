@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
@@ -35,6 +37,7 @@ export function WeightliftingSession({
   initialAbExercise,
   initialRemovedIds,
   draftEventId,
+  backdated = false,
   onFinish,
   finishing,
 }: {
@@ -43,10 +46,17 @@ export function WeightliftingSession({
   initialAbExercise?: EditableExercise | null;
   initialRemovedIds?: string[];
   draftEventId: string | null;
-  onFinish: (exercises: EditableExercise[], removedExerciseIds: string[]) => void;
+  /** Logging a previous workout: no save-and-exit drafts, and duration is asked for instead of timed. */
+  backdated?: boolean;
+  onFinish: (
+    exercises: EditableExercise[],
+    removedExerciseIds: string[],
+    durationMinutes: number | null
+  ) => void;
   finishing: boolean;
 }) {
   const router = useRouter();
+  const [duration, setDuration] = useState("");
   const [exercises, setExercises] = useState<EditableExercise[]>(
     () => initialExercises ?? session.exercises.map(toEditableExercise)
   );
@@ -174,11 +184,14 @@ export function WeightliftingSession({
   // actually logged, so that's what determines whether there's real progress.
   const hasProgress = allExercises.some((e) => e.sets.some((s) => s.actualReps != null));
 
+  // A backdated log came from the calendar, so exits land back there.
+  const exitHref = backdated ? "/calendar" : "/";
+
   const handleExitClick = async () => {
     if (!hasProgress) {
       setExiting(true);
       if (draftEventId) await discardDraftWorkout(draftEventId);
-      router.push("/");
+      router.push(exitHref);
       return;
     }
     setExitDialogOpen(true);
@@ -204,7 +217,7 @@ export function WeightliftingSession({
   const handleDiscardExit = async () => {
     setExiting(true);
     if (draftEventId) await discardDraftWorkout(draftEventId);
-    router.push("/");
+    router.push(exitHref);
   };
 
   return (
@@ -213,7 +226,7 @@ export function WeightliftingSession({
         <CategoryBadge colorKey={session.colorKey} label={session.workoutTypeName} />
       </div>
 
-      <AlexNote title="Today's brief">{session.brief}</AlexNote>
+      <AlexNote title={backdated ? "Session brief" : "Today's brief"}>{session.brief}</AlexNote>
 
       <div className="flex flex-col gap-4">
         {exercises.map((exercise, index) => (
@@ -292,6 +305,19 @@ export function WeightliftingSession({
         <Plus className="h-4 w-4" /> Add exercise
       </Button>
 
+      {backdated ? (
+        <div className="space-y-1.5">
+          <Label>How long was it? (minutes)</Label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            placeholder="e.g. 45"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+          />
+        </div>
+      ) : null}
+
       <div className="flex gap-2">
         <Button
           variant="outline"
@@ -304,28 +330,40 @@ export function WeightliftingSession({
         <Button
           size="lg"
           className="flex-[2]"
-          disabled={finishing || exiting}
-          onClick={() => onFinish(allExercises, finalRemovedIds())}
+          disabled={
+            finishing || exiting || (backdated && !((parseNumberInput(duration) ?? 0) > 0))
+          }
+          onClick={() =>
+            onFinish(allExercises, finalRemovedIds(), backdated ? parseNumberInput(duration) : null)
+          }
         >
-          {finishing ? "Saving…" : "Finish Workout"}
+          {finishing ? "Saving…" : backdated ? "Log Workout" : "Finish Workout"}
         </Button>
       </div>
 
       <Dialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Save your progress?</DialogTitle>
+            <DialogTitle>{backdated ? "Discard this log?" : "Save your progress?"}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            You can pick up right where you left off later, or discard this workout entirely.
+            {backdated
+              ? "Nothing has been saved yet — leaving now discards everything you entered."
+              : "You can pick up right where you left off later, or discard this workout entirely."}
           </p>
           <DialogFooter>
             <Button variant="ghost" disabled={exiting} onClick={handleDiscardExit}>
               Discard
             </Button>
-            <Button disabled={exiting} onClick={handleSaveAndExit}>
-              Save & Exit
-            </Button>
+            {backdated ? (
+              <Button disabled={exiting} onClick={() => setExitDialogOpen(false)}>
+                Keep editing
+              </Button>
+            ) : (
+              <Button disabled={exiting} onClick={handleSaveAndExit}>
+                Save & Exit
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
