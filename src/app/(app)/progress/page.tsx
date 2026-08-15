@@ -3,9 +3,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { AlexNote } from "@/components/shared/AlexNote";
 import { StatDisplay } from "@/components/shared/StatDisplay";
 import { ProgressBarLabeled } from "@/components/shared/ProgressBarLabeled";
-import { StrengthProgressChart } from "./StrengthProgressChart";
-import { BodyWeightChart } from "./BodyWeightChart";
-import { WorkoutBalanceChart } from "./WorkoutBalanceChart";
+import { StrengthProgressChart, BodyWeightChart, WorkoutBalanceChart } from "./LazyCharts";
 import { getProgressPageData } from "./data";
 
 const ACHIEVEMENT_ICON: Record<string, string> = {

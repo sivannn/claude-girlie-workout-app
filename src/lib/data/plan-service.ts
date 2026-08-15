@@ -275,19 +275,44 @@ export async function materializePlanWeek(
   ) % 7;
   weekStart.setDate(weekStart.getDate() - dayOfWeekOffset);
 
-  const planDays = await prisma.planDay.findMany({
-    where: { block: { plan: { id: plan.id } }, dayIndex: { in: plan.weekDays.map((d) => d.dayIndex) } },
-    include: { block: true },
-  });
-
-  // The lifting workout type the plan session maps onto — plan days are
-  // muscle-group based, so pick the closest existing type for the calendar.
-  const workoutTypes = await prisma.workoutType.findMany({
-    where: { userId, category: "WEIGHTLIFTING" },
-  });
+  // One ranged read covers every candidate day (offsets are all within the
+  // plan week), replacing the per-day count query the old loop paid. The
+  // workout types are the lifting types the plan sessions map onto — plan
+  // days are muscle-group based, so pick the closest existing type for the
+  // calendar.
+  const weekEndExclusive = new Date(weekStart);
+  weekEndExclusive.setDate(weekEndExclusive.getDate() + 7);
+  const [planDays, workoutTypes, existingEvents] = await Promise.all([
+    prisma.planDay.findMany({
+      where: { block: { plan: { id: plan.id } }, dayIndex: { in: plan.weekDays.map((d) => d.dayIndex) } },
+      include: { block: true },
+    }),
+    prisma.workoutType.findMany({
+      where: { userId, category: "WEIGHTLIFTING" },
+    }),
+    prisma.workoutEvent.findMany({
+      where: { userId, scheduledDate: { gte: weekStart, lt: weekEndExclusive } },
+      select: { scheduledDate: true },
+    }),
+  ]);
   if (workoutTypes.length === 0) return 0;
+  const occupiedDays = new Set(
+    existingEvents.map((e) =>
+      new Date(
+        e.scheduledDate.getFullYear(),
+        e.scheduledDate.getMonth(),
+        e.scheduledDate.getDate()
+      ).getTime()
+    )
+  );
 
-  let created = 0;
+  const toCreate: Array<{
+    userId: string;
+    workoutTypeId: string;
+    scheduledDate: Date;
+    status: "PLANNED";
+    createdBy: "AI";
+  }> = [];
   for (const day of plan.weekDays) {
     const planDay = planDays.find(
       (d) => d.dayIndex === day.dayIndex && d.block.orderIndex === plan.currentBlock.orderIndex
@@ -298,26 +323,21 @@ export async function materializePlanWeek(
     if (date < new Date(asOf.getFullYear(), asOf.getMonth(), asOf.getDate())) continue;
 
     const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const dayEnd = new Date(dayStart);
-    dayEnd.setDate(dayEnd.getDate() + 1);
-    const existing = await prisma.workoutEvent.count({
-      where: { userId, scheduledDate: { gte: dayStart, lt: dayEnd } },
-    });
-    if (existing > 0) continue;
+    if (occupiedDays.has(dayStart.getTime())) continue;
 
     const type = pickWorkoutTypeForDay(day.muscleGroups, workoutTypes);
-    await prisma.workoutEvent.create({
-      data: {
-        userId,
-        workoutTypeId: type.id,
-        scheduledDate: dayStart,
-        status: "PLANNED",
-        createdBy: "AI",
-      },
+    toCreate.push({
+      userId,
+      workoutTypeId: type.id,
+      scheduledDate: dayStart,
+      status: "PLANNED",
+      createdBy: "AI",
     });
-    created++;
   }
-  return created;
+  if (toCreate.length > 0) {
+    await prisma.workoutEvent.createMany({ data: toCreate });
+  }
+  return toCreate.length;
 }
 
 /** Maps a plan day's muscle groups onto the user's existing workout types. */
