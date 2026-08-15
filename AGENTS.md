@@ -50,6 +50,17 @@ against the live API** because no key was available while it was written; the
 first thing to do once a key is set is upload a real meal photo and sanity-check
 the estimate.
 
+## Optional — auth extras (password reset email, Google sign-in)
+
+| Variable | What it unlocks |
+| --- | --- |
+| `RESEND_API_KEY` | "Forgot password" reset emails, sent from `onboarding@resend.dev` via Resend (`src/lib/email.ts`). Requests still return the same success response without it — the send just fails server-side. **Free-tier caveat: Resend only delivers to the email address that owns the Resend account** until a domain is verified at resend.com/domains. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | "Continue with Google" on login and signup. The Google OAuth client must list the app origin and `<origin>/api/auth/callback/google` as an authorized redirect URI, and `BETTER_AUTH_URL` must match that origin exactly in production. |
+
+Also required for local auth work: `BETTER_AUTH_SECRET` in `.env` (see the
+required table above) — as of 2026-08-15 it was missing locally, so login on a
+local server fails until it's added.
+
 ## Please do NOT do these without asking Sivan first
 
 - Running any migration or script against the **production/Turso** database.
