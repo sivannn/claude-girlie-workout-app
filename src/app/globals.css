@@ -43,6 +43,10 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-day-tile: var(--day-tile);
+  --color-day-tile-today: var(--day-tile-today);
+  --color-day-outline-done: var(--day-outline-done);
+  --color-day-outline-planned: var(--day-outline-planned);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -205,6 +209,19 @@
   --cat-custom-cardio: color-mix(in oklch, var(--cat-family-cardio) 60%, oklch(0.5 0 0) 40%);
   --cat-custom-fun: color-mix(in oklch, var(--cat-family-fun) 60%, oklch(0.5 0 0) 40%);
   --cat-custom-recovery: color-mix(in oklch, var(--cat-family-recovery) 60%, oklch(0.5 0 0) 40%);
+
+  /* Calendar day tiles: a muted brown surface clearly lighter than the
+     page background (pulled toward Alex's reddish brown) so each day
+     reads as a distinct tile; today is lighter still, making it the
+     focal point without a ring. */
+  --day-tile: color-mix(in oklch, var(--background) 52%, var(--alex) 48%);
+  --day-tile-today: color-mix(in oklch, var(--day-tile), white 14%);
+  /* Status outlines drawn around a day tile. Green (completed) is the
+     Hunter Green family anchor, orange (scheduled) sits between Brandy
+     and Burnt Peach — each lightened just enough that a 2px edge reads
+     against both the brown tile and the dark page. */
+  --day-outline-done: color-mix(in oklch, var(--cat-family-fun), white 24%);
+  --day-outline-planned: color-mix(in oklch, var(--accent) 35%, var(--cat-family-weightlifting) 65%);
 }
 
 @layer base {
