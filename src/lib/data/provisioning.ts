@@ -18,6 +18,8 @@ function exerciseFields(ex: ExerciseSeed) {
     repRangeHigh: ex.repRangeHigh,
     defaultIncrementLb: ex.defaultIncrementLb,
     equipment: ex.equipment,
+    perSideWeight: ex.perSideWeight,
+    perSideReps: ex.perSideReps,
     muscleGroup: ex.muscleGroup,
     exerciseType: ex.exerciseType,
     difficultyTier: ex.difficultyTier,

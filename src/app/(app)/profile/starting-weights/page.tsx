@@ -106,6 +106,7 @@ export default async function StartingWeightsPage() {
       CATEGORY_NAME[e.workoutCategory as TrainingCategory] ?? e.workoutCategory,
     current: knownById.get(e.id) ?? null,
     hasHistory: loggedExerciseIds.has(e.id),
+    perSideWeight: e.perSideWeight,
   }));
 
   return (

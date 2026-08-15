@@ -8,6 +8,10 @@ export type GeneratedExerciseView = {
   coachAdjustment?: string | null;
   movementCategory: string;
   movementCategoryLabel: string;
+  /** Weight is entered per-implement, so it's labeled "each side". */
+  perSideWeight: boolean;
+  /** Reps are counted per side (unilateral/alternating), so labeled "each side". */
+  perSideReps: boolean;
   selectionReason: string;
   progressionReason: string;
   isDeload: boolean;

@@ -12,6 +12,7 @@ export type StartingWeightRow = {
   categoryLabel: string;
   current: number | null;
   hasHistory: boolean;
+  perSideWeight: boolean;
 };
 
 export function StartingWeightsForm({ rows }: { rows: StartingWeightRow[] }) {
@@ -80,7 +81,9 @@ export function StartingWeightsForm({ rows }: { rows: StartingWeightRow[] }) {
                     }
                     aria-label={`Working weight for ${row.name}`}
                   />
-                  <span className="text-xs text-muted-foreground">lb</span>
+                  <span className="whitespace-nowrap text-xs text-muted-foreground">
+                    lb{row.perSideWeight ? " each side" : ""}
+                  </span>
                 </div>
               </div>
             ))}

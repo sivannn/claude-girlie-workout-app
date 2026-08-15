@@ -18,6 +18,8 @@ export type WorkoutDetailSet = {
 export type WorkoutDetailExercise = {
   name: string;
   movementCategoryLabel: string;
+  perSideWeight: boolean;
+  perSideReps: boolean;
   changeSummary: string;
   improved: boolean;
   sets: WorkoutDetailSet[];
@@ -102,6 +104,8 @@ export async function getWorkoutDetail(workoutId: string): Promise<WorkoutDetail
     return {
       name: we.exercise.name,
       movementCategoryLabel: movementCategoryLabel(we.movementCategory as never),
+      perSideWeight: we.exercise.perSideWeight,
+      perSideReps: we.exercise.perSideReps,
       changeSummary,
       improved,
       sets: we.sets.map((s) => ({
