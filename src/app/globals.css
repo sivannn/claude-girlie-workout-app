@@ -254,4 +254,17 @@
     --muted-foreground: color-mix(in oklch, var(--done-foreground) 65%, var(--done-bg) 35%);
     --border: oklch(1 0 0 / 10%);
   }
+
+  /* The Steam "S" mark painted in currentColor: the one transparent asset
+     (steam-logo.png) is used as a mask, so the same shape can render red on
+     light surfaces (via <img>) or Powder Petal on the dark page background
+     (this class + text-foreground) without a second, recolored PNG. */
+  .steam-mark {
+    display: block;
+    background-color: currentColor;
+    mask-image: url("/steam-logo.png");
+    mask-size: contain;
+    mask-position: center;
+    mask-repeat: no-repeat;
+  }
 }
