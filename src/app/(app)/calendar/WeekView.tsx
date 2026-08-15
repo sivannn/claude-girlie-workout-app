@@ -40,6 +40,10 @@ export function WeekView({
       <div className="grid grid-cols-7 gap-1.5">
         {days.map((day) => {
           const dayEvents = eventsForDay(day);
+          // Same tile language as MonthGrid: filled brown tile, lighter
+          // today, green outline for completed / orange for scheduled.
+          const hasCompleted = dayEvents.some((e) => e.status === "COMPLETED" || e.status === "IN_PROGRESS");
+          const hasPlanned = dayEvents.some((e) => e.status === "PLANNED");
           const isSelected = selectedDay != null && isSameDay(day, selectedDay);
           return (
             <button
@@ -47,8 +51,9 @@ export function WeekView({
               type="button"
               onClick={() => setSelectedDay(day)}
               className={cn(
-                "flex flex-col items-center gap-1.5 rounded-lg border border-border/70 py-2 text-xs transition-colors",
-                isToday(day) && "ring-1 ring-accent",
+                "flex flex-col items-center gap-1.5 rounded-lg border-2 border-transparent bg-day-tile py-2 text-xs transition-colors",
+                isToday(day) && "bg-day-tile-today",
+                hasCompleted ? "border-day-outline-done" : hasPlanned && "border-day-outline-planned",
                 isSelected && "border-transparent bg-foreground"
               )}
             >

@@ -32,7 +32,6 @@ export default async function CalendarPage({
         gridEnd={monthData.gridEnd}
         events={monthData.events}
         weekEvents={weekEvents}
-        recommendedWorkoutTypeId={monthData.recommendedWorkoutTypeId}
         recommendationReason={monthData.recommendationReason}
         weeklyStatus={weeklyStatus}
         monthlySummary={monthlySummary}

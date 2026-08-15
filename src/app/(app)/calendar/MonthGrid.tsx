@@ -14,13 +14,11 @@ export function MonthGrid({
   gridEnd,
   events,
   monthDate,
-  recommendedWorkoutTypeId,
 }: {
   gridStart: Date;
   gridEnd: Date;
   events: CalendarEvent[];
   monthDate: Date;
-  recommendedWorkoutTypeId: string | null;
 }) {
   const days = useMemo(() => eachDayOfInterval({ start: gridStart, end: addDays(gridEnd, 0) }), [gridStart, gridEnd]);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -37,9 +35,10 @@ export function MonthGrid({
       <div className="mt-1 grid grid-cols-7 gap-1">
         {days.map((day) => {
           const dayEvents = eventsForDay(day);
-          const isRecommended = dayEvents.some(
-            (e) => e.workoutTypeId === recommendedWorkoutTypeId && e.status === "PLANNED"
-          );
+          // Completed wins over scheduled when a day has both; MISSED
+          // deliberately falls through to a plain tile with no outline.
+          const hasCompleted = dayEvents.some((e) => e.status === "COMPLETED" || e.status === "IN_PROGRESS");
+          const hasPlanned = dayEvents.some((e) => e.status === "PLANNED");
           const isSelected = selectedDay != null && isSameDay(day, selectedDay);
           return (
             <button
@@ -47,13 +46,13 @@ export function MonthGrid({
               type="button"
               onClick={() => setSelectedDay(day)}
               className={cn(
-                // Every day is an outlined, tappable box (spec: rounded box
-                // outline by default; selected flips to a light background
-                // with dark text).
-                "flex aspect-square flex-col items-center justify-start gap-0.5 rounded-lg border border-border/70 p-1 text-xs transition-colors",
+                // Every day is a filled brown tile lifted off the page;
+                // today is lighter still, status shows as an outline color,
+                // and selected flips to a light background with dark text.
+                "flex aspect-square flex-col items-center justify-start gap-0.5 rounded-lg border-2 border-transparent bg-day-tile p-1 text-xs transition-colors",
                 !isSameMonth(day, monthDate) && !isSelected && "opacity-30",
-                isToday(day) && "ring-1 ring-accent",
-                isRecommended && "bg-accent/10",
+                isToday(day) && "bg-day-tile-today",
+                hasCompleted ? "border-day-outline-done" : hasPlanned && "border-day-outline-planned",
                 isSelected && "border-transparent bg-foreground"
               )}
             >

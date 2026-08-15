@@ -23,7 +23,6 @@ export function CalendarClient({
   gridEnd,
   events,
   weekEvents,
-  recommendedWorkoutTypeId,
   recommendationReason,
   weeklyStatus,
   monthlySummary,
@@ -33,7 +32,6 @@ export function CalendarClient({
   gridEnd: Date;
   events: CalendarEvent[];
   weekEvents: CalendarEvent[];
-  recommendedWorkoutTypeId: string | null;
   recommendationReason: string | null;
   weeklyStatus: WeeklyStatus;
   monthlySummary: MonthlySummary;
@@ -72,13 +70,7 @@ export function CalendarClient({
             </Button>
           </div>
 
-          <MonthGrid
-            gridStart={gridStart}
-            gridEnd={gridEnd}
-            events={events}
-            monthDate={monthDate}
-            recommendedWorkoutTypeId={recommendedWorkoutTypeId}
-          />
+          <MonthGrid gridStart={gridStart} gridEnd={gridEnd} events={events} monthDate={monthDate} />
 
           <div className="space-y-3">
             <h2 className="text-sm font-semibold text-foreground">Monthly Summary</h2>
