@@ -163,7 +163,7 @@ export async function getCalendarMonthData(monthDate: Date) {
   const recommendationReason = recommendation
     ? await cachedInsight({
         userId: user.id,
-        category: "home_insight",
+        category: "home_reason",
         facts: { kind: "reason", type: recommendation.workoutType.name, reason: recommendation.reason },
         generate: () =>
           generateRecommendationReason(recommendation.workoutType.name, recommendation.reason),

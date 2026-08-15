@@ -85,6 +85,10 @@ export type AchievementType = (typeof ACHIEVEMENT_TYPES)[number];
 
 export const COACH_INSIGHT_CATEGORIES = [
   "home_insight",
+  // The recommendation reason lives apart from the fact-based home insight:
+  // cachedInsight keeps one row per category, so sharing a category made the
+  // two evict each other and re-call the API on every Home/Calendar load.
+  "home_reason",
   "workout_brief",
   "workout_recap",
   "goal_forecast",

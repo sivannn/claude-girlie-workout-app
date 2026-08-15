@@ -20,8 +20,12 @@ export const getSessionUser = cache(async () => {
  * The signed-in user with preferences, for Server Components and Actions.
  * Redirects to /login when there is no session — every caller can keep
  * assuming a user exists, exactly as under the old single-user placeholder.
+ *
+ * Cached per request: a page's layout and data functions each call this, and
+ * without the cache every call was its own database round-trip (the calendar
+ * page re-fetched the same User row ten times per load).
  */
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async () => {
   const sessionUser = await getSessionUser();
   if (!sessionUser) {
     redirect("/login");
@@ -47,4 +51,4 @@ export async function getCurrentUser() {
     if (!user) redirect("/login");
   }
   return user;
-}
+});
