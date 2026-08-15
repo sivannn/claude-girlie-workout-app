@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
@@ -87,8 +86,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
     <div className="flex flex-col gap-8">
       <div className="flex flex-col items-start gap-4">
         {/* Light logo: the auth screen sits directly on the dark Black Cherry
-            page background (no card), so the red mark would disappear. */}
-        <Image src="/steam-logo-light.png" alt="Steam" width={48} height={48} className="rounded-full" />
+            page background (no card), so the red mark would disappear. The
+            mark is masked from the one transparent logo asset and painted in
+            the Powder Petal foreground color — see .steam-mark in globals.css. */}
+        <span role="img" aria-label="Steam" className="steam-mark h-12 w-12 text-foreground" />
         <div className="space-y-1.5">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">{copy.title}</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">{copy.subtitle}</p>
